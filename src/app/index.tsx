@@ -2,19 +2,22 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SkeletonCard } from '../components/SkeletonCard';
 import { StoryCard } from '../components/StoryCard';
 import { useLibrary } from '../lib/LibraryProvider';
 import { colors, MAX_CONTENT_WIDTH, radius } from '../theme';
+import type { Story } from '../types';
 
 const GUTTER = 16;
 const MIN_CARD_WIDTH = 170;
 
 type Filter = 'all' | 'favorites';
+type Placeholder = { id: string; placeholder: true };
 
 export default function LibraryScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { stories, favorites, isFavorite, isCompleted, toggleFavorite } = useLibrary();
+  const { stories, loading, favorites, isFavorite, isCompleted, toggleFavorite } = useLibrary();
   const [filter, setFilter] = useState<Filter>('all');
 
   // Adaptive grid: 2 columns on iPhone portrait, up to 5 on a landscape iPad.
@@ -27,6 +30,14 @@ export default function LibraryScreen() {
     () => (filter === 'favorites' ? stories.filter((s) => favorites.includes(s.id)) : stories),
     [filter, stories, favorites],
   );
+
+  // Two rows of placeholders keep the layout steady while stories load.
+  const placeholders = useMemo<Placeholder[]>(
+    () => Array.from({ length: columns * 2 }, (_, i) => ({ id: `placeholder-${i}`, placeholder: true })),
+    [columns],
+  );
+
+  const rows: (Story | Placeholder)[] = loading ? placeholders : data;
 
   return (
     <View style={styles.screen}>
@@ -47,7 +58,8 @@ export default function LibraryScreen() {
       </View>
       <FlatList
         key={columns} // numColumns can't change on a mounted list
-        data={data}
+        data={rows}
+        scrollEnabled={!loading}
         numColumns={columns}
         keyExtractor={(s) => s.id}
         contentContainerStyle={{
@@ -57,16 +69,20 @@ export default function LibraryScreen() {
           width: Math.min(width, MAX_CONTENT_WIDTH),
         }}
         columnWrapperStyle={columns > 1 ? { gap: GUTTER, marginBottom: GUTTER } : undefined}
-        renderItem={({ item }) => (
-          <StoryCard
-            story={item}
-            width={cardWidth}
-            favorite={isFavorite(item.id)}
-            completed={isCompleted(item.id)}
-            onPress={() => router.push({ pathname: '/story/[id]', params: { id: item.id } })}
-            onToggleFavorite={() => toggleFavorite(item.id)}
-          />
-        )}
+        renderItem={({ item }) =>
+          'placeholder' in item ? (
+            <SkeletonCard width={cardWidth} label={item.id === 'placeholder-0' ? 'Loading stories' : undefined} />
+          ) : (
+            <StoryCard
+              story={item}
+              width={cardWidth}
+              favorite={isFavorite(item.id)}
+              completed={isCompleted(item.id)}
+              onPress={() => router.push({ pathname: '/story/[id]', params: { id: item.id } })}
+              onToggleFavorite={() => toggleFavorite(item.id)}
+            />
+          )
+        }
         ListEmptyComponent={
           <Text style={styles.empty}>
             {filter === 'favorites' ? 'Tap the heart on a story to save it here.' : 'No stories yet.'}

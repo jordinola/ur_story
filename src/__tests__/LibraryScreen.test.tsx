@@ -13,12 +13,14 @@ const stories = [
 
 const mockLibrary: {
   stories: Story[];
+  loading: boolean;
   favorites: string[];
   isFavorite: jest.Mock;
   isCompleted: jest.Mock;
   toggleFavorite: jest.Mock;
 } = {
   stories,
+  loading: false,
   favorites: [],
   isFavorite: jest.fn((id: string): boolean => mockLibrary.favorites.includes(id)),
   isCompleted: jest.fn((id: string) => id === 'c'),
@@ -35,6 +37,7 @@ function setWidth(width: number) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockLibrary.stories = stories;
+  mockLibrary.loading = false;
   mockLibrary.favorites = [];
   setWidth(390);
 });
@@ -119,6 +122,30 @@ describe('LibraryScreen', () => {
       await render(<LibraryScreen />);
 
       expect(screen.getByText('No stories yet.')).toBeOnTheScreen();
+    });
+  });
+
+  describe('loading', () => {
+    it('shows placeholder cards instead of stories while loading', async () => {
+      mockLibrary.loading = true;
+      mockLibrary.stories = [];
+      await render(<LibraryScreen />);
+
+      expect(screen.getByRole('progressbar', { name: 'Loading stories' })).toBeOnTheScreen();
+      expect(screen.queryByText('No stories yet.')).not.toBeOnTheScreen();
+    });
+
+    it('replaces the placeholders with stories once loaded', async () => {
+      mockLibrary.loading = true;
+      mockLibrary.stories = [];
+      const { rerender } = await render(<LibraryScreen />);
+
+      mockLibrary.loading = false;
+      mockLibrary.stories = stories;
+      await rerender(<LibraryScreen />);
+
+      expect(screen.queryByRole('progressbar')).not.toBeOnTheScreen();
+      expect(screen.getByText('Story A')).toBeOnTheScreen();
     });
   });
 
