@@ -14,22 +14,24 @@ Stack: Expo SDK 58, React Native 0.88, React 19, TypeScript, Expo Router (`src/a
 4. **Green before commit.** Nothing is committed or amended while tests, lint, or typecheck fail.
 5. **Tests with every change.** As much coverage as is practical (see section 4).
 6. **Don't trust memory for Expo APIs.** They change every SDK. Read the `expo` major version in `package.json` and check `https://docs.expo.dev/versions/v<major>.0.0/` (or `https://docs.expo.dev/llms.txt`) before touching any Expo, EAS, or React Native API.
+7. **Use the available skills and agents** before, during, and after coding (see section 4.4). They are part of the standard, not an optional extra.
 
 ---
 
 ## 2. Workflow overview
 
 ```
-main ──► branch ──► code + tests ──► checks green ──► single commit ──► push ──► PR
-                         ▲                                  │
-                         └──── review feedback: amend + force-push (with lease)
+main ──► branch ──► design + plan ──► code + tests ──► review passes ──► checks green ──► single commit ──► push ──► PR
+                                                                                              ▲                    │
+                                                                                              └── review feedback: amend + force-push (with lease)
 ```
 
 1. Update `main` and branch from it.
-2. Write a failing test, then the code (TDD where practical).
-3. Run the checks (section 4.3). All must pass.
-4. Commit once. Later changes **amend** that commit.
-5. Push and open the PR with the template (section 7).
+2. Brainstorm and plan (section 4.4). The spec and plan are written into the repo.
+3. Write a failing test, then the code (TDD where practical).
+4. Run the skill and agent reviews (section 4.4), then the checks (section 4.3). All must pass.
+5. Commit once, including the spec and plan files. Later changes **amend** that commit.
+6. Push and open the PR with the template (section 8).
 
 ---
 
@@ -139,6 +141,26 @@ npx tsc --noEmit         # no type errors
 Also run `npx expo-doctor` whenever dependencies or `app.json` change.
 
 Manual verification is required for UI and native-behavior changes: run on an iOS simulator (`npx expo run:ios`) in **iPhone portrait, iPhone landscape, and iPad**, and describe what you checked in the PR. Tests passing is not evidence that the UI works.
+
+### 4.4 Skills and agents
+
+Use the skills and agents available in the session at each stage. Invoke a skill before acting on its topic, and follow it rather than working from memory. Expo, EAS, and React Native API facts still come from the versioned docs (principle 6), never from a skill's or the model's recollection.
+
+| Stage | Required | Notes |
+| --- | --- | --- |
+| Before coding | `superpowers:brainstorming`, then `superpowers:writing-plans`. For bugs, `superpowers:systematic-debugging` first. | A trivial one-line change may skip brainstorming. |
+| While coding | `superpowers:test-driven-development`. For UI, `mobile-app-design:ios-screens`. As relevant: `hzblj-skills` `performance`, `lists`, `native-feel`, `ui-interactions`, `ui-surfaces`, `ui-typography`, `type-safety`, `hooks`, `error-handling`. | Dispatch a subagent for independent parallel work or deep research instead of bloating the main context. |
+| Before commit or amend | `superpowers:verification-before-completion`, `hzblj-skills:clean-review`, and for UI `mobile-app-design:ios-review` or `ui-design-review:review`. | Fix findings before committing. Don't dismiss them without a reason. |
+| Before marking the PR ready | `code-review` (and `superpowers:requesting-code-review` for larger changes). | Handle feedback with `superpowers:receiving-code-review`: verify, don't blindly apply. |
+
+Rules for skill output:
+
+- **Specs and plans are committed.** Write them to `docs/superpowers/specs/` and `docs/superpowers/plans/`. They go in the branch's single commit and are amended like any other change. Mention them in the commit bullets.
+- **Delete the plan when the work is done.** It goes stale quickly. The spec stays.
+- **This document wins on conflicts.** Skills that create commits, branches, worktrees, or PRs (for example `finishing-a-development-branch`) must follow sections 3 and 8: one commit, amend only, our PR template.
+- **Not applicable here:** the monorepo skills (`hzblj-skills:project`, `audit-imports`, `new-feature`) and `react-navigation`, because this is a single Expo Router app. Skill style preferences (named exports, const arrows, and so on) yield to the style of the surrounding code (section 7).
+- **Keep skill use out of the PR.** Don't list or describe which skills or agents were used in the PR description. Report the results (tests, screenshots, findings fixed), not the tooling.
+- **Authentication-gated plugins** (for example UXKIN) are optional. If one isn't connected, the skill falls back to platform conventions, and that is fine.
 
 ---
 
@@ -322,6 +344,7 @@ A feature or bug is done only when:
 
 - [ ] The work is on its own branch from `main`, in exactly one commit with a conforming message
 - [ ] Tests were added and `npm test`, lint, and typecheck all pass
+- [ ] The skill and agent steps in section 4.4 were done and their findings addressed
 - [ ] iOS best practices (section 5) were reviewed and UI was verified on simulator
 - [ ] The PR is open with the template filled in, and any review changes were amended into the single commit
 - [ ] No unrelated changes slipped in
