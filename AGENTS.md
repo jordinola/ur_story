@@ -1,5 +1,9 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+## Mandatory development rules
+
+Before starting ANY feature or bug fix, read and follow `docs/DEVELOPMENT_RULES.md`. It defines the iOS-first requirements, branching (from `main`), the one-commit-per-branch rule (amend, never add commits), the `feat:`/`bug:` commit format, the tests-must-pass gate, and the PR template. These rules are not optional.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
