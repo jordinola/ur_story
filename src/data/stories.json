@@ -1,0 +1,46 @@
+[
+  {
+    "id": "sleepy-moon",
+    "title": "The Sleepy Moon",
+    "description": "A little moon who can't fall asleep goes looking for the perfect lullaby.",
+    "durationSec": 300,
+    "ageRange": "3-6",
+    "language": "en",
+    "audio": "audio/sleepy-moon.mp3",
+    "color": "#7C83FD",
+    "emoji": "🌙"
+  },
+  {
+    "id": "brave-little-fox",
+    "title": "The Brave Little Fox",
+    "description": "Fox is afraid of the dark forest, until a firefly shows him how bright it can be.",
+    "durationSec": 420,
+    "ageRange": "4-7",
+    "language": "en",
+    "audio": "audio/brave-little-fox.mp3",
+    "color": "#FF9F68",
+    "emoji": "🦊"
+  },
+  {
+    "id": "whale-who-hummed",
+    "title": "The Whale Who Hummed",
+    "description": "A gentle whale learns that every song, even a small one, matters.",
+    "durationSec": 360,
+    "ageRange": "3-6",
+    "language": "en",
+    "audio": "audio/whale-who-hummed.mp3",
+    "color": "#4CC9F0",
+    "emoji": "🐳"
+  },
+  {
+    "id": "luna-y-el-bosque",
+    "title": "Luna y el bosque",
+    "description": "Luna descubre un bosque donde los árboles cuentan secretos al atardecer.",
+    "durationSec": 390,
+    "ageRange": "4-7",
+    "language": "es",
+    "audio": "audio/luna-y-el-bosque.mp3",
+    "color": "#6BCB77",
+    "emoji": "🌳"
+  }
+]
