@@ -1,8 +1,11 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { resolveUrl } from '../lib/catalog';
 import { formatMinutes } from '../lib/format';
 import { colors, radius } from '../theme';
 import type { Story } from '../types';
+
+const TITLE_LINES = 2;
+const TITLE_LINE_HEIGHT = 21;
 
 type Props = {
   story: Story;
@@ -14,6 +17,10 @@ type Props = {
 };
 
 export function StoryCard({ story, width, favorite, completed, onPress, onToggleFavorite }: Props) {
+  const { fontScale } = useWindowDimensions();
+  // Always reserve two lines (scaled for Dynamic Type) so every card in the grid has the same height.
+  const titleMinHeight = TITLE_LINES * TITLE_LINE_HEIGHT * fontScale;
+
   return (
     <View style={{ width }}>
       <Pressable
@@ -35,7 +42,7 @@ export function StoryCard({ story, width, favorite, completed, onPress, onToggle
           ) : null}
         </View>
         <View style={styles.body}>
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={[styles.title, { minHeight: titleMinHeight }]} numberOfLines={TITLE_LINES}>
             {story.title}
           </Text>
           <Text style={styles.meta}>
@@ -69,7 +76,7 @@ const styles = StyleSheet.create({
   cover: { alignItems: 'center', justifyContent: 'center' },
   emoji: { textAlign: 'center' },
   body: { padding: 12, gap: 4 },
-  title: { fontSize: 16, fontWeight: '700', color: colors.text },
+  title: { fontSize: 16, lineHeight: TITLE_LINE_HEIGHT, fontWeight: '700', color: colors.text },
   meta: { fontSize: 13, color: colors.muted },
   heart: {
     position: 'absolute',

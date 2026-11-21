@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { makeStory } from '../test/fixtures';
 import { StoryCard } from './StoryCard';
 
@@ -25,6 +26,14 @@ describe('StoryCard', () => {
 
     expect(screen.getByText('The Sleepy Moon')).toBeOnTheScreen();
     expect(screen.getByText('5 min · Ages 3-6')).toBeOnTheScreen();
+  });
+
+  it('limits the title to two lines and reserves room for both so card heights match', async () => {
+    await renderCard({ story: makeStory({ title: 'Short' }) });
+
+    const title = screen.getByText('Short');
+    expect(title.props.numberOfLines).toBe(2);
+    expect(StyleSheet.flatten(title.props.style).minHeight).toBeGreaterThanOrEqual(2 * 21);
   });
 
   it('exposes an accessible label with title and duration', async () => {
