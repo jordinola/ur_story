@@ -7,7 +7,7 @@ import { MiniPlayer } from '../components/MiniPlayer';
 import { SplashGate } from '../components/SplashGate';
 import { LibraryProvider } from '../lib/LibraryProvider';
 import { PlayerProvider } from '../lib/PlayerProvider';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 
 // Keep the native splash up (called at module scope so it runs before first render) until SplashGate hides it.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -25,6 +25,7 @@ export default function RootLayout() {
               screenOptions={{
                 headerStyle: { backgroundColor: colors.bg },
                 headerTintColor: colors.text,
+                headerTitleStyle: { fontFamily: fonts.rounded, fontWeight: '700' },
                 headerShadowVisible: false,
                 contentStyle: { backgroundColor: colors.bg },
               }}

@@ -1,9 +1,12 @@
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { resolveUrl } from '../lib/catalog';
 import { formatMinutes } from '../lib/format';
-import { colors, radius } from '../theme';
+import { cardShadow, colors, fonts, radius } from '../theme';
 import type { Story } from '../types';
 
+/** Cover height as a share of card width: tall in portrait, shorter in landscape so titles stay visible. */
+export const COVER_RATIO = { portrait: 0.78, landscape: 0.5 };
+export const COVER_INSET = 8;
 const TITLE_LINES = 2;
 const TITLE_LINE_HEIGHT = 21;
 
@@ -12,42 +15,53 @@ type Props = {
   width: number;
   favorite: boolean;
   completed: boolean;
+  /** Use the shorter cover so more of the card fits on a landscape screen. */
+  landscape?: boolean;
   onPress: () => void;
   onToggleFavorite: () => void;
 };
 
-export function StoryCard({ story, width, favorite, completed, onPress, onToggleFavorite }: Props) {
+export function StoryCard({ story, width, favorite, completed, landscape = false, onPress, onToggleFavorite }: Props) {
   const { fontScale } = useWindowDimensions();
+  const coverHeight = width * (landscape ? COVER_RATIO.landscape : COVER_RATIO.portrait);
   // Always reserve two lines (scaled for Dynamic Type) so every card in the grid has the same height.
   const titleMinHeight = TITLE_LINES * TITLE_LINE_HEIGHT * fontScale;
 
   return (
     <View style={{ width }}>
+      {/* The shadow lives on the outer view because iOS drops shadows on views that clip their content. */}
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={`${story.title}, ${formatMinutes(story.durationSec)}`}
-        style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.card, cardShadow, pressed && { opacity: 0.85 }]}
       >
-        <View style={[styles.cover, { backgroundColor: story.color, height: width * 0.78 }]}>
-          {story.cover ? (
-            <Image source={{ uri: resolveUrl(story.cover) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          ) : (
-            <Text style={[styles.emoji, { fontSize: width * 0.38 }]}>{story.emoji}</Text>
-          )}
-          {completed ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>✓ Listened</Text>
-            </View>
-          ) : null}
-        </View>
-        <View style={styles.body}>
-          <Text style={[styles.title, { minHeight: titleMinHeight }]} numberOfLines={TITLE_LINES}>
-            {story.title}
-          </Text>
-          <Text style={styles.meta}>
-            {formatMinutes(story.durationSec)} · Ages {story.ageRange}
-          </Text>
+        <View style={styles.clip}>
+          <View style={[styles.cover, { backgroundColor: story.color, height: coverHeight }]}>
+            {story.cover ? (
+              <Image source={{ uri: resolveUrl(story.cover) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <>
+                <View style={[styles.dot, styles.dotA]} />
+                <View style={[styles.dot, styles.dotB]} />
+                <View style={[styles.dot, styles.dotC]} />
+                <Text style={[styles.emoji, { fontSize: Math.min(width * 0.38, coverHeight * 0.62) }]}>{story.emoji}</Text>
+              </>
+            )}
+            {completed ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>✓ Listened</Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.body}>
+            <Text style={[styles.title, { minHeight: titleMinHeight }]} numberOfLines={TITLE_LINES}>
+              {story.title}
+            </Text>
+            <Text style={styles.meta}>
+              {formatMinutes(story.durationSec)} · Ages {story.ageRange}
+            </Text>
+          </View>
         </View>
       </Pressable>
       <Pressable
@@ -66,22 +80,21 @@ export function StoryCard({ story, width, favorite, completed, onPress, onToggle
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cover: { alignItems: 'center', justifyContent: 'center' },
+  card: { backgroundColor: colors.card, borderRadius: radius.xl },
+  clip: { borderRadius: radius.xl, overflow: 'hidden', padding: COVER_INSET },
+  cover: { alignItems: 'center', justifyContent: 'center', borderRadius: radius.xl - COVER_INSET, overflow: 'hidden' },
   emoji: { textAlign: 'center' },
-  body: { padding: 12, gap: 4 },
-  title: { fontSize: 16, lineHeight: TITLE_LINE_HEIGHT, fontWeight: '700', color: colors.text },
+  dot: { position: 'absolute', borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.5)' },
+  dotA: { width: 6, height: 6, top: '22%', left: '16%' },
+  dotB: { width: 9, height: 9, top: '14%', right: '40%' },
+  dotC: { width: 6, height: 6, bottom: '20%', left: '28%' },
+  body: { paddingHorizontal: 6, paddingTop: 10, paddingBottom: 6, gap: 4 },
+  title: { fontFamily: fonts.rounded, fontSize: 16, lineHeight: TITLE_LINE_HEIGHT, fontWeight: '700', color: colors.text },
   meta: { fontSize: 13, color: colors.muted },
   heart: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: COVER_INSET + 8,
+    right: COVER_INSET + 8,
     width: 36,
     height: 36,
     borderRadius: 18,

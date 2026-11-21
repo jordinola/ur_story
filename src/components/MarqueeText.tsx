@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   type StyleProp,
   type TextStyle,
 } from 'react-native';
+import { useReduceMotion } from '../lib/useReduceMotion';
 
 /** Scroll speed in points per second. Slow enough for a child to read along. */
 const SPEED = 30;
@@ -32,23 +32,12 @@ type Props = {
 export function MarqueeText({ children, style }: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [textWidth, setTextWidth] = useState(0);
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const reduceMotion = useReduceMotion();
   const [translateX] = useState(() => new Animated.Value(0));
 
-  useEffect(() => {
-    let cancelled = false;
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (!cancelled) setReduceMotion(enabled);
-    });
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
-    return () => {
-      cancelled = true;
-      subscription.remove();
-    };
-  }, []);
-
   const distance = textWidth - containerWidth;
-  const animating = !reduceMotion && containerWidth > 0 && distance > 0.5;
+  // Wait for the system's answer so the text never starts moving and then has to stop.
+  const animating = reduceMotion === false && containerWidth > 0 && distance > 0.5;
 
   useEffect(() => {
     if (!animating) {

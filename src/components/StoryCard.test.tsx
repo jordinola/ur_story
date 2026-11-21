@@ -48,6 +48,17 @@ describe('StoryCard', () => {
     expect(screen.getByText('🌙')).toBeOnTheScreen();
   });
 
+  it('uses a shorter cover in landscape so the title stays on screen', async () => {
+    const { unmount } = await renderCard();
+    const portraitHeight = StyleSheet.flatten(screen.getByText('🌙').parent?.props.style).height;
+    await unmount();
+
+    await renderCard({ landscape: true });
+    const landscapeHeight = StyleSheet.flatten(screen.getByText('🌙').parent?.props.style).height;
+
+    expect(landscapeHeight).toBeLessThan(portraitHeight);
+  });
+
   it('shows the cover image instead of the emoji when provided', async () => {
     await renderCard({ story: makeStory({ cover: 'https://cdn.example.com/moon.png' }) });
 

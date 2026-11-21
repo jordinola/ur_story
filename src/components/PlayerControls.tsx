@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { formatTime } from '../lib/format';
 import { usePlayer } from '../lib/PlayerProvider';
-import { colors, radius } from '../theme';
+import { cardShadow, colors, fonts, radius } from '../theme';
 
 const SLEEP_OPTIONS = [10, 20, 30];
 
@@ -86,12 +86,11 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    ...cardShadow,
   },
-  skipText: { fontSize: 18, fontWeight: '700', color: colors.text },
+  skipText: { fontFamily: fonts.rounded, fontSize: 18, fontWeight: '700', color: colors.text },
   playBtn: {
     width: 88,
     height: 88,
@@ -99,21 +98,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    ...cardShadow,
   },
   playText: { fontSize: 32, color: colors.primaryText },
   sleepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  sleepLabel: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  sleepLabel: { color: colors.text, fontFamily: fonts.rounded, fontSize: 15, fontWeight: '700' },
   sleepChips: { flexDirection: 'row', gap: 8 },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
   },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.text, fontWeight: '600' },
+  chipText: { color: colors.text, fontFamily: fonts.rounded, fontWeight: '700' },
   chipTextActive: { color: colors.primaryText },
   error: { color: colors.heart, fontSize: 14, textAlign: 'center' },
 });
