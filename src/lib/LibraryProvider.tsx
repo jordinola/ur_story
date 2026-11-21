@@ -18,6 +18,8 @@ const EMPTY: LibraryState = { favorites: [], progress: {}, completed: [] };
 type LibraryContextValue = {
   stories: Story[];
   ready: boolean;
+  /** True until saved state and the first catalog (cached or bundled) have both loaded. */
+  loading: boolean;
   favorites: string[];
   isFavorite: (id: string) => boolean;
   toggleFavorite: (id: string) => void;
@@ -34,6 +36,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [stories, setStories] = useState<Story[]>([]);
   const [state, setState] = useState<LibraryState>(EMPTY);
   const [ready, setReady] = useState(false);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
   const loaded = useRef(false);
 
   useEffect(() => {
@@ -49,7 +52,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (!cancelled) setReady(true);
     })();
     loadCatalog((local) => {
-      if (!cancelled) setStories(local);
+      if (cancelled) return;
+      setStories(local);
+      setCatalogLoaded(true);
     }).then((fresh) => {
       if (!cancelled) setStories(fresh);
     });
@@ -87,6 +92,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     () => ({
       stories,
       ready,
+      loading: !ready || !catalogLoaded,
       favorites: state.favorites,
       isFavorite: (id) => state.favorites.includes(id),
       toggleFavorite,
@@ -96,7 +102,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       isCompleted: (id) => state.completed.includes(id),
       getStory: (id) => stories.find((s) => s.id === id),
     }),
-    [stories, ready, state, toggleFavorite, saveProgress, markCompleted],
+    [stories, ready, catalogLoaded, state, toggleFavorite, saveProgress, markCompleted],
   );
 
   return <LibraryContext.Provider value={value}>{children}</LibraryContext.Provider>;

@@ -34,6 +34,22 @@ describe('useLibrary', () => {
 });
 
 describe('LibraryProvider', () => {
+  it('reports loading until saved state and the catalog have both loaded', async () => {
+    const releases: (() => void)[] = [];
+    // Saved state and the cached catalog are each read once; hold both open.
+    const pending = () => new Promise<null>((resolve) => releases.push(() => resolve(null)));
+    jest.mocked(AsyncStorage.getItem).mockImplementationOnce(pending).mockImplementationOnce(pending);
+
+    const hook = await renderHook(() => useLibrary(), { wrapper });
+    expect(hook.result.current.loading).toBe(true);
+
+    await act(async () => {
+      releases.forEach((release) => release());
+    });
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(hook.result.current.stories.length).toBeGreaterThan(0);
+  });
+
   it('loads the bundled catalog and becomes ready with empty state', async () => {
     const { result } = await setup();
 
