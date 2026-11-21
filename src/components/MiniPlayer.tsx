@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayer } from '../lib/PlayerProvider';
 import { colors } from '../theme';
+import { MarqueeText } from './MarqueeText';
 
 /** Compact now-playing bar shown on every screen except the story screen. */
 export function MiniPlayer() {
@@ -27,9 +28,9 @@ export function MiniPlayer() {
           onPress={() => router.push({ pathname: '/story/[id]', params: { id: p.current!.id } })}
         >
           <Text style={styles.emoji}>{p.current.emoji}</Text>
-          <Text style={styles.title} numberOfLines={1}>
-            {p.current.title}
-          </Text>
+          <View style={styles.titleWrap}>
+            <MarqueeText style={styles.title}>{p.current.title}</MarqueeText>
+          </View>
         </Pressable>
         <Pressable
           onPress={p.toggle}
@@ -51,7 +52,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingTop: 8, gap: 12 },
   info: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   emoji: { fontSize: 26 },
-  title: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
+  titleWrap: { flex: 1, minWidth: 0 },
+  title: { fontSize: 16, fontWeight: '700', color: colors.text },
   btn: {
     width: 44,
     height: 44,
