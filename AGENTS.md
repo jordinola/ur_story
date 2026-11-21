@@ -2,7 +2,7 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 
 ## Mandatory development rules
 
-Before starting ANY feature or bug fix, read and follow `docs/DEVELOPMENT_RULES.md`. It defines the iOS-first requirements, branching (from `main`), the one-commit-per-branch rule (amend, never add commits), the `feat:`/`bug:` commit format, the tests-must-pass gate, and the PR template. These rules are not optional.
+Before starting ANY feature or bug fix, read and follow `docs/DEVELOPMENT_RULES.md`. It defines the iOS-first requirements, branching (from `main`), the one-commit-per-branch rule (amend, never add commits), the `feat:`/`bug:` commit format, the tests-must-pass gate, the required skills/agents workflow (brainstorm, plan, TDD, review), and the PR template. These rules are not optional.
 
 ## Expo has changed — do not trust your training data
 
