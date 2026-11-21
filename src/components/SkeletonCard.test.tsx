@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react-native';
-import { AccessibilityInfo, Animated } from 'react-native';
+import { AccessibilityInfo, Animated, StyleSheet } from 'react-native';
 import { SkeletonCard } from './SkeletonCard';
 
 beforeEach(() => {
@@ -22,6 +22,18 @@ describe('SkeletonCard', () => {
     await render(<SkeletonCard width={170} />);
 
     expect(screen.queryByRole('progressbar')).not.toBeOnTheScreen();
+  });
+
+  it('uses the same shorter cover as story cards in landscape', async () => {
+    const coverHeight = () => StyleSheet.flatten(screen.getByTestId('skeleton-cover').props.style).height;
+
+    const { unmount } = await render(<SkeletonCard width={200} label="Loading" />);
+    const portrait = coverHeight();
+    await unmount();
+    await render(<SkeletonCard width={200} label="Loading" landscape />);
+    const landscape = coverHeight();
+
+    expect(landscape).toBeLessThan(portrait);
   });
 
   it('pulses to show that content is on the way', async () => {

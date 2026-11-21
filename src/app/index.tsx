@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonCard } from '../components/SkeletonCard';
 import { StoryCard } from '../components/StoryCard';
 import { useLibrary } from '../lib/LibraryProvider';
-import { colors, MAX_CONTENT_WIDTH, radius } from '../theme';
+import { colors, fonts, MAX_CONTENT_WIDTH, radius } from '../theme';
 import type { Story } from '../types';
 
 const GUTTER = 16;
@@ -15,7 +15,8 @@ type Filter = 'all' | 'favorites';
 type Placeholder = { id: string; placeholder: true };
 
 export default function LibraryScreen() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const landscape = width > height;
   const insets = useSafeAreaInsets();
   const { stories, loading, favorites, isFavorite, isCompleted, toggleFavorite } = useLibrary();
   const [filter, setFilter] = useState<Filter>('all');
@@ -71,13 +72,18 @@ export default function LibraryScreen() {
         columnWrapperStyle={columns > 1 ? { gap: GUTTER, marginBottom: GUTTER } : undefined}
         renderItem={({ item }) =>
           'placeholder' in item ? (
-            <SkeletonCard width={cardWidth} label={item.id === 'placeholder-0' ? 'Loading stories' : undefined} />
+            <SkeletonCard
+              width={cardWidth}
+              landscape={landscape}
+              label={item.id === 'placeholder-0' ? 'Loading stories' : undefined}
+            />
           ) : (
             <StoryCard
               story={item}
               width={cardWidth}
               favorite={isFavorite(item.id)}
               completed={isCompleted(item.id)}
+              landscape={landscape}
               onPress={() => router.push({ pathname: '/story/[id]', params: { id: item.id } })}
               onToggleFavorite={() => toggleFavorite(item.id)}
             />
@@ -99,13 +105,13 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 9,
-    borderRadius: radius.lg,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
   },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.text, fontWeight: '600' },
+  chipText: { color: colors.text, fontFamily: fonts.rounded, fontWeight: '700' },
   chipTextActive: { color: colors.primaryText },
   empty: { textAlign: 'center', color: colors.muted, marginTop: 48, fontSize: 16 },
 });

@@ -7,7 +7,7 @@ import { resolveUrl } from '../../lib/catalog';
 import { formatMinutes } from '../../lib/format';
 import { useLibrary } from '../../lib/LibraryProvider';
 import { usePlayer } from '../../lib/PlayerProvider';
-import { colors, MAX_CONTENT_WIDTH } from '../../theme';
+import { cardShadow, colors, fonts, MAX_CONTENT_WIDTH, radius } from '../../theme';
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,13 +41,16 @@ export default function StoryScreen() {
     : Math.min(contentWidth, 420);
   const fav = isFavorite(story.id);
 
+  // Shadow sits on the outer view because iOS drops shadows on views that clip their content.
   const cover = (
-    <View style={[styles.cover, { width: coverSize, height: coverSize, backgroundColor: story.color }]}>
-      {story.cover ? (
-        <Image source={{ uri: resolveUrl(story.cover) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-      ) : (
-        <Text style={{ fontSize: coverSize * 0.45 }}>{story.emoji}</Text>
-      )}
+    <View style={styles.coverShadow}>
+      <View style={[styles.cover, { width: coverSize, height: coverSize, backgroundColor: story.color }]}>
+        {story.cover ? (
+          <Image source={{ uri: resolveUrl(story.cover) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <Text style={{ fontSize: coverSize * 0.45 }}>{story.emoji}</Text>
+        )}
+      </View>
     </View>
   );
 
@@ -97,10 +100,11 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingTop: 8, alignSelf: 'center', width: '100%', maxWidth: MAX_CONTENT_WIDTH },
   columnLayout: { alignItems: 'center', gap: 24 },
   rowLayout: { flexDirection: 'row', alignItems: 'center', gap: 36 },
-  cover: { borderRadius: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  cover: { borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  coverShadow: { borderRadius: radius.xl, backgroundColor: colors.card, ...cardShadow },
   details: { width: '100%', gap: 16 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  title: { fontSize: 26, fontWeight: '800', color: colors.text },
+  title: { fontFamily: fonts.rounded, fontSize: 26, fontWeight: '800', color: colors.text },
   meta: { color: colors.muted, fontSize: 14, marginTop: 4 },
   heart: { fontSize: 30 },
   description: { fontSize: 16, lineHeight: 23, color: colors.text },
