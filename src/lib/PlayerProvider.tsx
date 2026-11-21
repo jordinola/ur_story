@@ -47,7 +47,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const pendingSeek = useRef<number | null>(null);
   const currentRef = useRef<Story | null>(null);
-  currentRef.current = current;
+  const positionRef = useRef(0);
+
+  // Keep refs in sync after commit (not during render). Declared first so the
+  // effects below always read fresh values.
+  useEffect(() => {
+    currentRef.current = current;
+    positionRef.current = status.currentTime;
+  });
 
   useEffect(() => {
     setAudioModeAsync({
@@ -76,7 +83,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           albumTitle: 'Bedtime stories',
         });
         player.play();
-      } catch (e) {
+      } catch {
         setError('Could not load this story. Check your connection and the audio URL.');
       }
     },
@@ -93,8 +100,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [status.isLoaded, player]);
 
   // Save progress periodically while playing, and when pausing.
-  const positionRef = useRef(0);
-  positionRef.current = status.currentTime;
   useEffect(() => {
     if (!status.playing) {
       const c = currentRef.current;
