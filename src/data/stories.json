@@ -42,5 +42,49 @@
     "audio": "audio/luna-y-el-bosque.mp3",
     "color": "#6BCB77",
     "emoji": "🌳"
+  },
+  {
+    "id": "dragon-and-the-thunderstorm",
+    "title": "The Dragon Who Was Afraid of Thunderstorms",
+    "description": "A little dragon who breathes fire hides from every storm, until a tiny cloud teaches him that thunder is just the sky clapping.",
+    "durationSec": 480,
+    "ageRange": "4-7",
+    "language": "en",
+    "audio": "audio/dragon-and-the-thunderstorm.mp3",
+    "color": "#6BCB77",
+    "emoji": "🐉"
+  },
+  {
+    "id": "captain-penguin-ice-cream",
+    "title": "Captain Penguin and the Great Ice Cream Rescue",
+    "description": "Captain Penguin sails across the frozen sea to save the village ice cream before the sun melts it.",
+    "durationSec": 540,
+    "ageRange": "5-8",
+    "language": "en",
+    "audio": "audio/captain-penguin-ice-cream.mp3",
+    "color": "#9AA5F5",
+    "emoji": "🐧"
+  },
+  {
+    "id": "pips-rainy-day",
+    "title": "Pip's Rainy Day",
+    "description": "Pip the frog has been waiting all summer for rain, and now every puddle is an adventure.",
+    "durationSec": 240,
+    "ageRange": "3-5",
+    "language": "en",
+    "audio": "audio/pips-rainy-day.mp3",
+    "color": "#F2C14E",
+    "emoji": "🐸"
+  },
+  {
+    "id": "la-tortuga-que-queria-volar",
+    "title": "La tortuga que quería volar",
+    "description": "Una tortuga muy curiosa sueña con volar y descubre que las nubes también se pueden alcanzar despacio.",
+    "durationSec": 360,
+    "ageRange": "4-7",
+    "language": "es",
+    "audio": "audio/la-tortuga-que-queria-volar.mp3",
+    "color": "#F28AA8",
+    "emoji": "🐢"
   }
 ]
