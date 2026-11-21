@@ -18,6 +18,15 @@ describe('bundledCatalog', () => {
     expect(bundledCatalog.length).toBeGreaterThan(0);
   });
 
+  it('has enough stories to scroll the library grid in portrait and landscape', () => {
+    expect(bundledCatalog.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('includes long titles so title overflow is exercised', () => {
+    const long = bundledCatalog.filter((s) => s.title.length > 35);
+    expect(long.length).toBeGreaterThanOrEqual(2);
+  });
+
   it('has unique ids', () => {
     const ids = bundledCatalog.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
