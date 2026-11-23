@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { bundledCatalog, loadCatalog, resolveUrl } from './catalog';
+import { bundledCatalog, loadCatalog, normalizeStory, resolveUrl } from './catalog';
+import { INTEREST_TAGS, STORY_GENRES } from './tags';
 
 describe('resolveUrl', () => {
   it('returns absolute http(s) URLs unchanged', () => {
@@ -83,5 +84,83 @@ describe('loadCatalog (no ASSET_BASE_URL configured)', () => {
     await loadCatalog(jest.fn());
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('normalizeStory', () => {
+  const raw = {
+    id: 'a',
+    title: 'T',
+    description: 'D',
+    durationSec: 10,
+    ageRange: '3-6',
+    language: 'en',
+    audio: 'audio/a.mp3',
+    color: '#000000',
+    emoji: 'x',
+  };
+
+  it('derives ageMin/ageMax from ageRange', () => {
+    expect(normalizeStory(raw)).toMatchObject({ ageMin: 3, ageMax: 6 });
+  });
+
+  it('falls back to 0-99 for an unparsable ageRange', () => {
+    expect(normalizeStory({ ...raw, ageRange: 'all ages' })).toMatchObject({ ageMin: 0, ageMax: 99 });
+  });
+
+  it('defaults missing genres and tags to empty arrays', () => {
+    expect(normalizeStory(raw)).toMatchObject({ genres: [], tags: [] });
+  });
+
+  it('drops non-string entries', () => {
+    const story = normalizeStory({ ...raw, genres: ['Bedtime', 3, null], tags: [1, 'Magic'] });
+    expect(story?.genres).toEqual(['Bedtime']);
+    expect(story?.tags).toEqual(['Magic']);
+  });
+
+  it.each(['id', 'title', 'audio'])('returns null when %s is missing', (key) => {
+    expect(normalizeStory({ ...raw, [key]: undefined })).toBeNull();
+  });
+
+  it('returns null for non-objects', () => {
+    expect(normalizeStory(null)).toBeNull();
+    expect(normalizeStory('x')).toBeNull();
+  });
+
+  it('keeps explicit ageMin/ageMax', () => {
+    expect(normalizeStory({ ...raw, ageMin: 1, ageMax: 2 })).toMatchObject({ ageMin: 1, ageMax: 2 });
+  });
+});
+
+describe('loadCatalog normalization', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('normalizes a cached catalog lacking the new fields', async () => {
+    const legacy = [{
+      id: 'old', title: 'Old', description: 'd', durationSec: 5, ageRange: '2-4',
+      language: 'en', audio: 'audio/old.mp3', color: '#111111', emoji: 'o',
+    }];
+    await AsyncStorage.setItem('storytime:catalog:v1', JSON.stringify(legacy));
+
+    const result = await loadCatalog(jest.fn());
+
+    expect(result[0]).toMatchObject({ id: 'old', ageMin: 2, ageMax: 4, genres: [], tags: [] });
+  });
+});
+
+describe('bundled catalog metadata', () => {
+  it.each(bundledCatalog.map((s) => [s.id, s] as const))('story %s has genres, tags and an age span', (_id, s) => {
+    expect(s.genres.length).toBeGreaterThan(0);
+    expect(s.tags.length).toBeGreaterThan(0);
+    expect(s.ageMin).toBeLessThanOrEqual(s.ageMax);
+    s.tags.forEach((t) => expect(INTEREST_TAGS).toContain(t));
+    s.genres.forEach((g) => expect(STORY_GENRES).toContain(g));
+  });
+
+  it('uses every listed genre in at least one bundled story', () => {
+    const used = new Set(bundledCatalog.flatMap((s) => s.genres));
+    STORY_GENRES.forEach((g) => expect(used).toContain(g));
   });
 });

@@ -11,6 +11,7 @@ const mockPlayer = {
   replace: jest.fn(),
   seekTo: jest.fn(() => Promise.resolve()),
   setActiveForLockScreen: jest.fn(),
+  clearLockScreenControls: jest.fn(),
 };
 
 let mockStatus = {
@@ -35,6 +36,9 @@ const mockLibrary = {
 };
 jest.mock('./LibraryProvider', () => ({ useLibrary: () => mockLibrary }));
 
+let mockActiveId: string | null = 'k1';
+jest.mock('./ProfilesProvider', () => ({ useProfiles: () => ({ activeId: mockActiveId }) }));
+
 const wrapper = ({ children }: { children: ReactNode }) => <PlayerProvider>{children}</PlayerProvider>;
 
 const story = makeStory();
@@ -51,6 +55,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
   mockPlayer.playing = false;
+  mockActiveId = 'k1';
   mockLibrary.getProgress.mockReturnValue(0);
   mockStatus = {
     isLoaded: false,
@@ -322,6 +327,44 @@ describe('PlayerProvider', () => {
       expect(result.current.sleepMinutes).toBeNull();
       expect(result.current.sleepRemainingSec).toBeNull();
       expect(mockPlayer.pause).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('profile switch', () => {
+    it('stops playback and never writes progress or completion into the new profile', async () => {
+      setStatus({ playing: true, currentTime: 42 });
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+      mockPlayer.pause.mockClear();
+      mockLibrary.saveProgress.mockClear();
+
+      mockActiveId = 'k2';
+      await rerender({});
+
+      expect(mockPlayer.pause).toHaveBeenCalled();
+      expect(mockPlayer.clearLockScreenControls).toHaveBeenCalled();
+      expect(result.current.current).toBeNull();
+
+      await act(async () => jest.advanceTimersByTime(15_000));
+      setStatus({ playing: false, currentTime: 50 });
+      await rerender({});
+      setStatus({ playing: false, currentTime: 300, didJustFinish: true });
+      await rerender({});
+
+      expect(mockLibrary.saveProgress).not.toHaveBeenCalled();
+      expect(mockLibrary.markCompleted).not.toHaveBeenCalled();
+    });
+
+    it('does not stop anything on mount or when the active profile is unchanged', async () => {
+      setStatus({ playing: true, currentTime: 42 });
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+
+      await rerender({});
+
+      expect(mockPlayer.pause).not.toHaveBeenCalled();
+      expect(mockPlayer.clearLockScreenControls).not.toHaveBeenCalled();
+      expect(result.current.current).toEqual(story);
     });
   });
 });

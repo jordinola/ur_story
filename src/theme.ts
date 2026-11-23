@@ -15,6 +15,12 @@ export const colors = {
   shadow: '#C2410C',
 };
 
+/** Profile avatar backgrounds. Each passes WCAG AA (4.5:1) under white initials. */
+export const avatarColors: string[] = ['#1D4ED8', '#B91C1C', '#047857', '#7E22CE', '#C2410C', '#0E7490'];
+
+/** Spoken names for `avatarColors`, index for index (VoiceOver labels for the color swatches). */
+export const avatarColorNames: string[] = ['Blue', 'Red', 'Green', 'Purple', 'Orange', 'Teal'];
+
 export const radius = { sm: 10, md: 16, lg: 24, xl: 28, pill: 999 };
 
 /** iOS rounded system font for a friendlier look. Other platforms keep their default font. */
