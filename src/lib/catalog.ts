@@ -17,7 +17,37 @@ export function resolveUrl(path: string): string {
   return `${base}/${path.replace(/^\/+/, '')}`;
 }
 
-export const bundledCatalog = bundled as Story[];
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const stringsOnly = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+
+const parseAgeRange = (ageRange: unknown): { min: number; max: number } => {
+  const match = typeof ageRange === 'string' ? /^(\d+)-(\d+)$/.exec(ageRange) : null;
+  return match ? { min: Number(match[1]), max: Number(match[2]) } : { min: 0, max: 99 };
+};
+
+/** Fills in fields older catalogs lack; returns null when a story is unusable. */
+export function normalizeStory(raw: unknown): Story | null {
+  if (!isRecord(raw)) return null;
+  const { id, title, audio } = raw;
+  if (typeof id !== 'string' || typeof title !== 'string' || typeof audio !== 'string') return null;
+  if (!id || !title || !audio) return null;
+  const range = parseAgeRange(raw.ageRange);
+  return {
+    ...(raw as Story),
+    ageMin: typeof raw.ageMin === 'number' ? raw.ageMin : range.min,
+    ageMax: typeof raw.ageMax === 'number' ? raw.ageMax : range.max,
+    genres: stringsOnly(raw.genres),
+    tags: stringsOnly(raw.tags),
+  };
+}
+
+const normalizeCatalog = (raw: unknown): Story[] =>
+  Array.isArray(raw) ? raw.map(normalizeStory).filter((s): s is Story => s !== null) : [];
+
+export const bundledCatalog = normalizeCatalog(bundled);
 
 /**
  * Returns the cached/bundled catalog immediately via `onLocal`, then tries to
@@ -28,7 +58,10 @@ export async function loadCatalog(onLocal: (stories: Story[]) => void): Promise<
   let current = bundledCatalog;
   try {
     const cached = await AsyncStorage.getItem(CATALOG_CACHE_KEY);
-    if (cached) current = JSON.parse(cached) as Story[];
+    if (cached) {
+      const parsed = normalizeCatalog(JSON.parse(cached));
+      if (parsed.length > 0) current = parsed;
+    }
   } catch {
     // ignore cache errors, fall back to bundled
   }
@@ -42,8 +75,8 @@ export async function loadCatalog(onLocal: (stories: Story[]) => void): Promise<
     const res = await fetch(resolveUrl('stories.json'), { signal: controller.signal });
     clearTimeout(timer);
     if (!res.ok) return current;
-    const remote = (await res.json()) as Story[];
-    if (Array.isArray(remote) && remote.length > 0) {
+    const remote = normalizeCatalog(await res.json());
+    if (remote.length > 0) {
       await AsyncStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(remote));
       return remote;
     }

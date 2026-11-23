@@ -1,15 +1,22 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AddProfileCard } from '../components/AddProfileCard';
 import { SkeletonCard } from '../components/SkeletonCard';
 import { StoryCard } from '../components/StoryCard';
+import { StoryRow } from '../components/StoryRow';
 import { useLibrary } from '../lib/LibraryProvider';
+import { useProfiles } from '../lib/ProfilesProvider';
+import { buildHomeSections } from '../lib/recommend';
 import { colors, fonts, MAX_CONTENT_WIDTH, radius } from '../theme';
 import type { Story } from '../types';
 
 const GUTTER = 16;
 const MIN_CARD_WIDTH = 170;
+/** Row cards show this many cards at once on a phone, so the next one peeks in and hints at scrolling. */
+const ROW_VISIBLE_CARDS = 2.3;
+const ADD_PROFILE_ROUTE = '/profiles/edit' as Href;
 
 type Filter = 'all' | 'favorites';
 type Placeholder = { id: string; placeholder: true };
@@ -18,7 +25,8 @@ export default function LibraryScreen() {
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
   const insets = useSafeAreaInsets();
-  const { stories, loading, favorites, isFavorite, isCompleted, toggleFavorite } = useLibrary();
+  const { stories, loading, favorites, progress, completed, isFavorite, isCompleted, toggleFavorite } = useLibrary();
+  const { ready: profilesReady, activeProfile } = useProfiles();
   const [filter, setFilter] = useState<Filter>('all');
 
   // Adaptive grid: 2 columns on iPhone portrait, up to 5 on a landscape iPad.
@@ -26,6 +34,13 @@ export default function LibraryScreen() {
   const contentWidth = Math.min(width, MAX_CONTENT_WIDTH) - sidePad * 2;
   const columns = Math.max(2, Math.floor((contentWidth + GUTTER) / (MIN_CARD_WIDTH + GUTTER)));
   const cardWidth = (contentWidth - GUTTER * (columns - 1)) / columns;
+
+  const rowCardWidth = Math.min(cardWidth, (contentWidth - GUTTER * 2) / ROW_VISIBLE_CARDS);
+
+  const sections = useMemo(
+    () => (activeProfile ? buildHomeSections({ stories, profile: activeProfile, progress, completed }) : null),
+    [stories, activeProfile, progress, completed],
+  );
 
   const data = useMemo(
     () => (filter === 'favorites' ? stories.filter((s) => favorites.includes(s.id)) : stories),
@@ -39,6 +54,58 @@ export default function LibraryScreen() {
   );
 
   const rows: (Story | Placeholder)[] = loading ? placeholders : data;
+
+  const renderCard = (story: Story, width: number) => (
+    <StoryCard
+      story={story}
+      width={width}
+      favorite={isFavorite(story.id)}
+      completed={isCompleted(story.id)}
+      landscape={landscape}
+      onPress={() => router.push({ pathname: '/story/[id]', params: { id: story.id } })}
+      onToggleFavorite={() => toggleFavorite(story.id)}
+    />
+  );
+
+  const showSections = sections !== null && filter === 'all' && !loading;
+  const header = (
+    <View>
+      {profilesReady && !activeProfile ? <AddProfileCard onPress={() => router.push(ADD_PROFILE_ROUTE)} /> : null}
+      {showSections ? (
+        // Rows bleed to the list's edges so their cards scroll under the gutter instead of clipping at it.
+        <View style={{ marginHorizontal: -sidePad }}>
+          {sections.continueListening.length > 0 ? (
+            <StoryRow
+              title="Continue listening"
+              stories={sections.continueListening}
+              sidePad={sidePad}
+              renderCard={(story) => renderCard(story, rowCardWidth)}
+            />
+          ) : null}
+          {sections.picked.length > 0 ? (
+            <StoryRow
+              title={`Picked for ${activeProfile?.name ?? ''}`}
+              stories={sections.picked}
+              sidePad={sidePad}
+              renderCard={(story) => renderCard(story, rowCardWidth)}
+            />
+          ) : null}
+          {sections.genres.map((group) => (
+            <StoryRow
+              key={group.genre}
+              title={group.genre}
+              stories={group.stories}
+              sidePad={sidePad}
+              renderCard={(story) => renderCard(story, rowCardWidth)}
+            />
+          ))}
+          <Text accessibilityRole="header" style={[styles.sectionHeading, { paddingHorizontal: sidePad }]}>
+            All stories
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
 
   return (
     <View style={styles.screen}>
@@ -78,17 +145,10 @@ export default function LibraryScreen() {
               label={item.id === 'placeholder-0' ? 'Loading stories' : undefined}
             />
           ) : (
-            <StoryCard
-              story={item}
-              width={cardWidth}
-              favorite={isFavorite(item.id)}
-              completed={isCompleted(item.id)}
-              landscape={landscape}
-              onPress={() => router.push({ pathname: '/story/[id]', params: { id: item.id } })}
-              onToggleFavorite={() => toggleFavorite(item.id)}
-            />
+            renderCard(item, cardWidth)
           )
         }
+        ListHeaderComponent={header}
         ListEmptyComponent={
           <Text style={styles.empty}>
             {filter === 'favorites' ? 'Tap the heart on a story to save it here.' : 'No stories yet.'}
@@ -113,5 +173,12 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.text, fontFamily: fonts.rounded, fontWeight: '700' },
   chipTextActive: { color: colors.primaryText },
+  sectionHeading: {
+    color: colors.text,
+    fontFamily: fonts.rounded,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
   empty: { textAlign: 'center', color: colors.muted, marginTop: 48, fontSize: 16 },
 });

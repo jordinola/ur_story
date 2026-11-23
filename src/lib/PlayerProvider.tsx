@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,6 +12,7 @@ import {
 } from 'react';
 import { resolveUrl } from './catalog';
 import { useLibrary } from './LibraryProvider';
+import { useProfiles } from './ProfilesProvider';
 import type { Story } from '../types';
 
 type PlayerContextValue = {
@@ -36,6 +38,7 @@ const PROGRESS_SAVE_INTERVAL_MS = 5000;
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { saveProgress, markCompleted, getProgress } = useLibrary();
+  const { activeId } = useProfiles();
   const player = useAudioPlayer();
   const status = useAudioPlayerStatus(player);
 
@@ -49,9 +52,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const currentRef = useRef<Story | null>(null);
   const positionRef = useRef(0);
 
-  // Keep refs in sync after commit (not during render). Declared first so the
-  // effects below always read fresh values.
-  useEffect(() => {
+  // Keep refs in sync after commit (not during render). Declared first, and a layout effect, so the
+  // effects below (including the profile-switch layout effect) always read fresh values.
+  useLayoutEffect(() => {
     currentRef.current = current;
     positionRef.current = status.currentTime;
   });
@@ -98,6 +101,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       player.seekTo(target).catch(() => {});
     }
   }, [status.isLoaded, player]);
+
+  // Library writes go to the active profile, so a story started by one kid must never save into
+  // another's. On a switch, stop and forget the story before any later tick, pause or finish fires,
+  // and drop the lock-screen session so it cannot restart the previous kid's story out of the app.
+  // Layout effect so nothing can run between the commit of the new profile and this cleanup.
+  const playingFor = useRef(activeId);
+  useLayoutEffect(() => {
+    if (playingFor.current === activeId) return;
+    playingFor.current = activeId;
+    currentRef.current = null;
+    pendingSeek.current = null;
+    setCurrent(null);
+    player.pause();
+    player.clearLockScreenControls();
+  }, [activeId, player]);
 
   // Save progress periodically while playing, and when pausing.
   useEffect(() => {

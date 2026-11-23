@@ -1,4 +1,4 @@
-import { colors } from './theme';
+import { avatarColorNames, avatarColors, colors } from './theme';
 
 function luminance(hex: string) {
   const n = parseInt(hex.slice(1), 16);
@@ -27,5 +27,25 @@ describe('theme colors', () => {
 
   it('keeps the primary button distinguishable from the background (3:1)', () => {
     expect(contrast(colors.primary, colors.bg)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('avatarColors', () => {
+  it('offers six distinct colors', () => {
+    expect(avatarColors).toHaveLength(6);
+    expect(new Set(avatarColors).size).toBe(6);
+  });
+
+  it.each(avatarColors)('keeps white initials on %s at WCAG AA (4.5:1)', (color) => {
+    expect(contrast('#FFFFFF', color)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('names every color, uniquely', () => {
+    expect(avatarColorNames).toHaveLength(avatarColors.length);
+    expect(new Set(avatarColorNames).size).toBe(avatarColorNames.length);
+  });
+
+  it('keeps the white no-profile glyph on the muted neutral at WCAG AA (4.5:1)', () => {
+    expect(contrast(colors.primaryText, colors.muted)).toBeGreaterThanOrEqual(4.5);
   });
 });

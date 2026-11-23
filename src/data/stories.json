@@ -5,6 +5,16 @@
     "description": "A little moon who can't fall asleep goes looking for the perfect lullaby.",
     "durationSec": 300,
     "ageRange": "3-6",
+    "ageMin": 3,
+    "ageMax": 6,
+    "genres": [
+      "Bedtime",
+      "Fantasy"
+    ],
+    "tags": [
+      "Bedtime",
+      "Space"
+    ],
     "language": "en",
     "audio": "audio/sleepy-moon.mp3",
     "color": "#7C83FD",
@@ -16,6 +26,16 @@
     "description": "Fox is afraid of the dark forest, until a firefly shows him how bright it can be.",
     "durationSec": 420,
     "ageRange": "4-7",
+    "ageMin": 4,
+    "ageMax": 7,
+    "genres": [
+      "Adventure"
+    ],
+    "tags": [
+      "Animals",
+      "Nature",
+      "Feelings"
+    ],
     "language": "en",
     "audio": "audio/brave-little-fox.mp3",
     "color": "#FF9F68",
@@ -27,6 +47,17 @@
     "description": "A gentle whale learns that every song, even a small one, matters.",
     "durationSec": 360,
     "ageRange": "3-6",
+    "ageMin": 3,
+    "ageMax": 6,
+    "genres": [
+      "Bedtime",
+      "Fable"
+    ],
+    "tags": [
+      "Ocean",
+      "Animals",
+      "Feelings"
+    ],
     "language": "en",
     "audio": "audio/whale-who-hummed.mp3",
     "color": "#4CC9F0",
@@ -38,6 +69,16 @@
     "description": "Luna descubre un bosque donde los árboles cuentan secretos al atardecer.",
     "durationSec": 390,
     "ageRange": "4-7",
+    "ageMin": 4,
+    "ageMax": 7,
+    "genres": [
+      "Adventure",
+      "Fantasy"
+    ],
+    "tags": [
+      "Nature",
+      "Magic"
+    ],
     "language": "es",
     "audio": "audio/luna-y-el-bosque.mp3",
     "color": "#6BCB77",
@@ -49,6 +90,17 @@
     "description": "A little dragon who breathes fire hides from every storm, until a tiny cloud teaches him that thunder is just the sky clapping.",
     "durationSec": 480,
     "ageRange": "4-7",
+    "ageMin": 4,
+    "ageMax": 7,
+    "genres": [
+      "Fantasy",
+      "Adventure"
+    ],
+    "tags": [
+      "Dragons",
+      "Feelings",
+      "Magic"
+    ],
     "language": "en",
     "audio": "audio/dragon-and-the-thunderstorm.mp3",
     "color": "#6BCB77",
@@ -60,6 +112,17 @@
     "description": "Captain Penguin sails across the frozen sea to save the village ice cream before the sun melts it.",
     "durationSec": 540,
     "ageRange": "5-8",
+    "ageMin": 5,
+    "ageMax": 8,
+    "genres": [
+      "Adventure",
+      "Comedy"
+    ],
+    "tags": [
+      "Animals",
+      "Ocean",
+      "Friendship"
+    ],
     "language": "en",
     "audio": "audio/captain-penguin-ice-cream.mp3",
     "color": "#9AA5F5",
@@ -71,6 +134,15 @@
     "description": "Pip the frog has been waiting all summer for rain, and now every puddle is an adventure.",
     "durationSec": 240,
     "ageRange": "3-5",
+    "ageMin": 3,
+    "ageMax": 5,
+    "genres": [
+      "Slice of Life"
+    ],
+    "tags": [
+      "Nature",
+      "Friendship"
+    ],
     "language": "en",
     "audio": "audio/pips-rainy-day.mp3",
     "color": "#F2C14E",
@@ -82,6 +154,17 @@
     "description": "Una tortuga muy curiosa sueña con volar y descubre que las nubes también se pueden alcanzar despacio.",
     "durationSec": 360,
     "ageRange": "4-7",
+    "ageMin": 4,
+    "ageMax": 7,
+    "genres": [
+      "Adventure",
+      "Fable"
+    ],
+    "tags": [
+      "Animals",
+      "Feelings",
+      "Friendship"
+    ],
     "language": "es",
     "audio": "audio/la-tortuga-que-queria-volar.mp3",
     "color": "#F28AA8",
