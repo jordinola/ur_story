@@ -39,7 +39,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "audio:placeholders": "node scripts/placeholderAudio.js"
   },
   "private": true,
   "jest": {

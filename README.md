@@ -80,6 +80,9 @@ app.json          Expo config (bundle id, background audio plugin)
 
 Until then the UI works but playback shows an error message.
 
+### Placeholder audio
+To test playback before real recordings exist, install ffmpeg (`brew install ffmpeg`) and run `npm run audio:placeholders`. It writes a quiet tone MP3 per story to `placeholder-audio/` (git-ignored), matching each story's `audio` path, so the folder can be uploaded to R2 as is. Options: `--seconds <n>` for short files, `--silent`, `--force` to overwrite.
+
 ### Story format
 Each entry in `stories.json` looks like this:
 ```json

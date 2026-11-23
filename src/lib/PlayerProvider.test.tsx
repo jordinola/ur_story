@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { setAudioModeAsync } from 'expo-audio';
 import type { ReactNode } from 'react';
 import { makeStory } from '../test/fixtures';
+import { ASSET_BASE_URL } from './catalog';
 import { PlayerProvider, usePlayer } from './PlayerProvider';
 
 const mockPlayer = {
@@ -110,7 +111,7 @@ describe('PlayerProvider', () => {
       await act(async () => result.current.play(story));
 
       expect(result.current.current).toEqual(story);
-      expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: '/audio/sleepy-moon.mp3' });
+      expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: `${ASSET_BASE_URL}/audio/sleepy-moon.mp3` });
       expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
         true,
         expect.objectContaining({ title: story.title }),
