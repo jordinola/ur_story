@@ -42,3 +42,6 @@ yarn-error.*
 
 # test coverage
 coverage/
+
+# generated placeholder audio
+/placeholder-audio

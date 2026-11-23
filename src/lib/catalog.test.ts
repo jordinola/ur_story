@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { bundledCatalog, loadCatalog, normalizeStory, resolveUrl } from './catalog';
+import { ASSET_BASE_URL, bundledCatalog, loadCatalog, normalizeStory, resolveUrl } from './catalog';
 import { INTEREST_TAGS, STORY_GENRES } from './tags';
 
 describe('resolveUrl', () => {
@@ -9,8 +9,17 @@ describe('resolveUrl', () => {
   });
 
   it('strips leading slashes from relative paths', () => {
-    expect(resolveUrl('audio/moon.mp3')).toBe('/audio/moon.mp3');
-    expect(resolveUrl('///audio/moon.mp3')).toBe('/audio/moon.mp3');
+    expect(resolveUrl('audio/moon.mp3', 'https://cdn.example.com/')).toBe(
+      'https://cdn.example.com/audio/moon.mp3',
+    );
+    expect(resolveUrl('///audio/moon.mp3', 'https://cdn.example.com')).toBe(
+      'https://cdn.example.com/audio/moon.mp3',
+    );
+  });
+
+  it('uses the configured R2 base URL by default', () => {
+    expect(ASSET_BASE_URL).toMatch(/^https:\/\//);
+    expect(resolveUrl('audio/moon.mp3')).toBe(`${ASSET_BASE_URL}/audio/moon.mp3`);
   });
 });
 
@@ -55,7 +64,7 @@ describe('loadCatalog (no ASSET_BASE_URL configured)', () => {
 
   it('delivers the bundled catalog locally and resolves with it', async () => {
     const onLocal = jest.fn();
-    const result = await loadCatalog(onLocal);
+    const result = await loadCatalog(onLocal, '');
 
     expect(onLocal).toHaveBeenCalledWith(bundledCatalog);
     expect(result).toBe(bundledCatalog);
@@ -66,7 +75,7 @@ describe('loadCatalog (no ASSET_BASE_URL configured)', () => {
     await AsyncStorage.setItem('storytime:catalog:v1', JSON.stringify(cached));
 
     const onLocal = jest.fn();
-    const result = await loadCatalog(onLocal);
+    const result = await loadCatalog(onLocal, '');
 
     expect(onLocal).toHaveBeenCalledWith(cached);
     expect(result).toEqual(cached);
@@ -75,13 +84,13 @@ describe('loadCatalog (no ASSET_BASE_URL configured)', () => {
   it('falls back to the bundled catalog when the cache is corrupt', async () => {
     await AsyncStorage.setItem('storytime:catalog:v1', '{not json');
 
-    const result = await loadCatalog(jest.fn());
+    const result = await loadCatalog(jest.fn(), '');
 
     expect(result).toBe(bundledCatalog);
   });
 
   it('does not hit the network when no base URL is set', async () => {
-    await loadCatalog(jest.fn());
+    await loadCatalog(jest.fn(), '');
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });

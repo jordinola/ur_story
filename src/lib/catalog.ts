@@ -7,13 +7,13 @@ import type { Story } from '../types';
  * e.g. a Cloudflare R2 public bucket: 'https://pub-xxxxxxxx.r2.dev'
  * Leave empty to use only the bundled catalog (audio will not play until set).
  */
-export const ASSET_BASE_URL = '';
+export const ASSET_BASE_URL = 'https://pub-ff88c981ec8d4520a207eb8a2a199674.r2.dev';
 
 const CATALOG_CACHE_KEY = 'storytime:catalog:v1';
 
-export function resolveUrl(path: string): string {
+export function resolveUrl(path: string, baseUrl: string = ASSET_BASE_URL): string {
   if (/^https?:\/\//i.test(path)) return path;
-  const base = ASSET_BASE_URL.replace(/\/+$/, '');
+  const base = baseUrl.replace(/\/+$/, '');
   return `${base}/${path.replace(/^\/+/, '')}`;
 }
 
@@ -54,7 +54,10 @@ export const bundledCatalog = normalizeCatalog(bundled);
  * refresh from `${ASSET_BASE_URL}/stories.json` so you can publish new stories
  * without shipping an app update.
  */
-export async function loadCatalog(onLocal: (stories: Story[]) => void): Promise<Story[]> {
+export async function loadCatalog(
+  onLocal: (stories: Story[]) => void,
+  baseUrl: string = ASSET_BASE_URL,
+): Promise<Story[]> {
   let current = bundledCatalog;
   try {
     const cached = await AsyncStorage.getItem(CATALOG_CACHE_KEY);
@@ -67,12 +70,12 @@ export async function loadCatalog(onLocal: (stories: Story[]) => void): Promise<
   }
   onLocal(current);
 
-  if (!ASSET_BASE_URL) return current;
+  if (!baseUrl) return current;
 
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(resolveUrl('stories.json'), { signal: controller.signal });
+    const res = await fetch(resolveUrl('stories.json', baseUrl), { signal: controller.signal });
     clearTimeout(timer);
     if (!res.ok) return current;
     const remote = normalizeCatalog(await res.json());
