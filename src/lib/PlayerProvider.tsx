@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { resolveUrl } from './catalog';
 import { useLibrary } from './LibraryProvider';
+import { DEFAULT_RATE } from './playbackRates';
 import { useProfiles } from './ProfilesProvider';
 import type { Story } from '../types';
 
@@ -30,11 +31,21 @@ type PlayerContextValue = {
   sleepMinutes: number | null;
   sleepRemainingSec: number | null;
   setSleepTimer: (minutes: number | null) => void;
+  playbackRate: number;
+  setPlaybackRate: (rate: number) => void;
 };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 const PROGRESS_SAVE_INTERVAL_MS = 5000;
+const SLEEP_TICK_MS = 1000;
+const FADE_MS = 10_000;
+const FADE_TICK_MS = 250;
+
+// expo-audio exposes volume as a plain property; keep the assignment out of the component body.
+const setVolume = (player: { volume: number }, volume: number) => {
+  player.volume = volume;
+};
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { saveProgress, markCompleted, getProgress } = useLibrary();
@@ -44,6 +55,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const [current, setCurrent] = useState<Story | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [playbackRate, setRate] = useState<number>(DEFAULT_RATE);
   const [sleepMinutes, setSleepMinutes] = useState<number | null>(null);
   const [sleepEndsAt, setSleepEndsAt] = useState<number | null>(null);
   const [sleepRemainingSec, setSleepRemainingSec] = useState<number | null>(null);
@@ -51,12 +63,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const pendingSeek = useRef<number | null>(null);
   const currentRef = useRef<Story | null>(null);
   const positionRef = useRef(0);
+  const playingRef = useRef(false);
 
   // Keep refs in sync after commit (not during render). Declared first, and a layout effect, so the
   // effects below (including the profile-switch layout effect) always read fresh values.
   useLayoutEffect(() => {
     currentRef.current = current;
     positionRef.current = status.currentTime;
+    playingRef.current = status.playing;
   });
 
   useEffect(() => {
@@ -68,6 +82,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, []);
 
+  const restoreVolume = useCallback(() => {
+    try {
+      setVolume(player, 1);
+    } catch {
+      // the native player may already be released during unmount
+    }
+  }, [player]);
+
   const play = useCallback(
     (story: Story) => {
       if (currentRef.current?.id === story.id) {
@@ -76,7 +98,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
       setError(null);
       setCurrent(story);
+      setRate(DEFAULT_RATE);
+      restoreVolume();
       try {
+        player.setPlaybackRate(DEFAULT_RATE);
         const saved = getProgress(story.id);
         pendingSeek.current = saved > 3 ? saved : null;
         player.replace({ uri: resolveUrl(story.audio) });
@@ -90,7 +115,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setError('Could not load this story. Check your connection and the audio URL.');
       }
     },
-    [player, getProgress],
+    [player, getProgress, restoreVolume],
   );
 
   // Resume from the saved position once the new source has loaded.
@@ -113,6 +138,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     currentRef.current = null;
     pendingSeek.current = null;
     setCurrent(null);
+    setSleepMinutes(null);
+    setSleepEndsAt(null);
+    setSleepRemainingSec(null);
     player.pause();
     player.clearLockScreenControls();
   }, [activeId, player]);
@@ -142,21 +170,47 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setSleepRemainingSec(minutes ? minutes * 60 : null);
   }, []);
 
+  // Fade the volume out over the last FADE_MS, then pause. The cleanup restores full volume on every
+  // way out: timer cleared or replaced, profile switch, unmount, and the natural end.
   useEffect(() => {
     if (sleepEndsAt == null) return;
-    const id = setInterval(() => {
-      const remaining = Math.round((sleepEndsAt - Date.now()) / 1000);
-      if (remaining <= 0) {
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const delay = sleepEndsAt - Date.now() <= FADE_MS ? FADE_TICK_MS : SLEEP_TICK_MS;
+      timer = setTimeout(tick, delay);
+    };
+    const tick = () => {
+      const remainingMs = sleepEndsAt - Date.now();
+      if (remainingMs <= 0) {
         player.pause();
         setSleepMinutes(null);
         setSleepEndsAt(null);
         setSleepRemainingSec(null);
-      } else {
-        setSleepRemainingSec(remaining);
+        return;
       }
-    }, 1000);
-    return () => clearInterval(id);
-  }, [sleepEndsAt, player]);
+      setSleepRemainingSec(Math.round(remainingMs / 1000));
+      if (remainingMs <= FADE_MS && playingRef.current) setVolume(player, remainingMs / FADE_MS);
+      schedule();
+    };
+    schedule();
+    return () => {
+      clearTimeout(timer);
+      restoreVolume();
+    };
+  }, [sleepEndsAt, player, restoreVolume]);
+
+  // Paused mid-fade (in the app, on the lock screen, or by an interruption): don't leave it quiet.
+  useEffect(() => {
+    if (!status.playing) restoreVolume();
+  }, [status.playing, restoreVolume]);
+
+  const setPlaybackRate = useCallback(
+    (rate: number) => {
+      setRate(rate);
+      player.setPlaybackRate(rate);
+    },
+    [player],
+  );
 
   const toggle = useCallback(() => {
     if (player.playing) player.pause();
@@ -193,8 +247,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       sleepMinutes,
       sleepRemainingSec,
       setSleepTimer,
+      playbackRate,
+      setPlaybackRate,
     }),
-    [current, status, error, play, toggle, seekBy, seekTo, sleepMinutes, sleepRemainingSec, setSleepTimer],
+    [current, status, error, play, toggle, seekBy, seekTo, sleepMinutes, sleepRemainingSec, setSleepTimer, playbackRate, setPlaybackRate],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

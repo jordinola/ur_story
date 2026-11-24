@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { PlayerControls } from './PlayerControls';
 
 const mockPlayer = {
@@ -13,6 +14,8 @@ const mockPlayer = {
   sleepMinutes: null as number | null,
   sleepRemainingSec: null as number | null,
   setSleepTimer: jest.fn(),
+  playbackRate: 1,
+  setPlaybackRate: jest.fn(),
 };
 
 jest.mock('../lib/PlayerProvider', () => ({ usePlayer: () => mockPlayer }));
@@ -27,6 +30,34 @@ beforeEach(() => {
     error: null,
     sleepMinutes: null,
     sleepRemainingSec: null,
+    playbackRate: 1,
+  });
+});
+
+describe('PlayerControls speed chips', () => {
+  it('offers 0.75x, 1x and 1.25x with the current rate selected', async () => {
+    mockPlayer.playbackRate = 1.25;
+    await render(<PlayerControls />);
+
+    expect(screen.getByLabelText('0.75x speed')).toBeOnTheScreen();
+    expect(screen.getByLabelText('1x speed')).toBeOnTheScreen();
+    expect(screen.getByLabelText('1.25x speed').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByLabelText('1x speed').props.accessibilityState).toEqual({ selected: false });
+  });
+
+  it('keeps chips at least 44pt tall', async () => {
+    await render(<PlayerControls />);
+
+    const chip = screen.getByLabelText('1x speed');
+    expect(StyleSheet.flatten(chip.props.style).minHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  it('sets the rate when a chip is pressed', async () => {
+    await render(<PlayerControls />);
+
+    await fireEvent.press(screen.getByLabelText('0.75x speed'));
+
+    expect(mockPlayer.setPlaybackRate).toHaveBeenCalledWith(0.75);
   });
 });
 
@@ -121,8 +152,8 @@ describe('PlayerControls', () => {
       mockPlayer.sleepMinutes = 10;
       await render(<PlayerControls />);
 
-      expect(screen.getByText('10m')).toBeOnTheScreen();
-      expect(screen.getAllByRole('button', { selected: true })).toHaveLength(1);
+      expect(screen.getByRole('button', { name: '10m', selected: true })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: '20m', selected: true })).toBeNull();
     });
 
     it('shows the remaining time when a timer is running', async () => {

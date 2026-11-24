@@ -13,6 +13,8 @@ const mockPlayer = {
   seekTo: jest.fn(() => Promise.resolve()),
   setActiveForLockScreen: jest.fn(),
   clearLockScreenControls: jest.fn(),
+  setPlaybackRate: jest.fn(),
+  volume: 1,
 };
 
 let mockStatus = {
@@ -56,6 +58,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
   mockPlayer.playing = false;
+  mockPlayer.volume = 1;
   mockActiveId = 'k1';
   mockLibrary.getProgress.mockReturnValue(0);
   mockStatus = {
@@ -295,6 +298,44 @@ describe('PlayerProvider', () => {
     });
   });
 
+  describe('playback speed', () => {
+    it('defaults to 1x', async () => {
+      const { result } = await setup();
+      expect(result.current.playbackRate).toBe(1);
+    });
+
+    it('sets the player rate and reports it', async () => {
+      const { result } = await setup();
+
+      await act(async () => result.current.setPlaybackRate(1.25));
+
+      expect(mockPlayer.setPlaybackRate).toHaveBeenCalledWith(1.25);
+      expect(result.current.playbackRate).toBe(1.25);
+    });
+
+    it('resets to 1x when a different story starts', async () => {
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+      await act(async () => result.current.setPlaybackRate(0.75));
+      mockPlayer.setPlaybackRate.mockClear();
+
+      await act(async () => result.current.play(makeStory({ id: 'other', audio: 'audio/other.mp3' })));
+
+      expect(result.current.playbackRate).toBe(1);
+      expect(mockPlayer.setPlaybackRate).toHaveBeenCalledWith(1);
+    });
+
+    it('keeps the rate when the current story is played again', async () => {
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+      await act(async () => result.current.setPlaybackRate(1.25));
+
+      await act(async () => result.current.play(story));
+
+      expect(result.current.playbackRate).toBe(1.25);
+    });
+  });
+
   describe('sleep timer', () => {
     it('counts down and reports remaining seconds', async () => {
       const { result } = await setup();
@@ -328,6 +369,87 @@ describe('PlayerProvider', () => {
       expect(result.current.sleepMinutes).toBeNull();
       expect(result.current.sleepRemainingSec).toBeNull();
       expect(mockPlayer.pause).not.toHaveBeenCalled();
+    });
+
+    describe('fade-out', () => {
+      const startTimerAtFade = async (elapsedMs: number) => {
+        setStatus({ playing: true });
+        const utils = await setup();
+        await act(async () => utils.result.current.setSleepTimer(1));
+        await act(async () => jest.advanceTimersByTime(elapsedMs));
+        return utils;
+      };
+
+      it('keeps full volume until 10 seconds remain', async () => {
+        await startTimerAtFade(49_000);
+
+        expect(mockPlayer.volume).toBe(1);
+      });
+
+      it('ramps the volume down linearly over the final 10 seconds', async () => {
+        await startTimerAtFade(55_000);
+
+        expect(mockPlayer.volume).toBeCloseTo(0.5, 1);
+      });
+
+      it('pauses and restores full volume when the timer ends', async () => {
+        await startTimerAtFade(61_000);
+
+        expect(mockPlayer.pause).toHaveBeenCalled();
+        expect(mockPlayer.volume).toBe(1);
+      });
+
+      it('restores volume when playback is paused mid-fade', async () => {
+        const { rerender } = await startTimerAtFade(55_000);
+
+        setStatus({ playing: false });
+        await rerender({});
+
+        expect(mockPlayer.volume).toBe(1);
+      });
+
+      it('restores volume when a new story starts mid-fade', async () => {
+        const { result } = await startTimerAtFade(55_000);
+
+        await act(async () => result.current.play(story));
+
+        expect(mockPlayer.volume).toBe(1);
+      });
+
+      it('restores volume when the timer is cleared mid-fade', async () => {
+        const { result } = await startTimerAtFade(55_000);
+
+        await act(async () => result.current.setSleepTimer(null));
+
+        expect(mockPlayer.volume).toBe(1);
+      });
+
+      it('restores volume when the timer is replaced mid-fade', async () => {
+        const { result } = await startTimerAtFade(55_000);
+
+        await act(async () => result.current.setSleepTimer(20));
+
+        expect(mockPlayer.volume).toBe(1);
+      });
+
+      it('clears the timer and restores volume when the profile changes mid-fade', async () => {
+        const { result, rerender } = await startTimerAtFade(55_000);
+
+        mockActiveId = 'k2';
+        await rerender({});
+
+        expect(result.current.sleepMinutes).toBeNull();
+        expect(result.current.sleepRemainingSec).toBeNull();
+        expect(mockPlayer.volume).toBe(1);
+      });
+
+      it('restores volume when the provider unmounts mid-fade', async () => {
+        const { unmount } = await startTimerAtFade(55_000);
+
+        await unmount();
+
+        expect(mockPlayer.volume).toBe(1);
+      });
     });
   });
 

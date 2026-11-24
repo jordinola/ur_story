@@ -6,7 +6,7 @@ Kids' story audio player for iPhone + iPad, portrait and landscape. No backend.
 - Expo (SDK 58) + TypeScript + Expo Router (routes in `src/app/`)
 - Library screen with adaptive grid (2 columns on iPhone portrait, more on iPad / landscape) and an All / Favorites filter
 - Story screen: stacked on iPhone portrait, two panes on iPad and iPhone landscape
-- Audio via `expo-audio`: background playback, lock-screen controls, ±15s, tap-to-seek, sleep timer (10/20/30 min)
+- Audio via `expo-audio`: background playback, lock-screen controls, ±15s, tap-to-seek, speed chips (0.75x/1x/1.25x, resets per story), sleep timer (10/20/30 min) with a 10 second fade-out
 - Local-only data (AsyncStorage): favorites, resume position, "listened" badge
 - Catalog: bundled `src/data/stories.json`, optionally refreshed from `${ASSET_BASE_URL}/stories.json`
 
