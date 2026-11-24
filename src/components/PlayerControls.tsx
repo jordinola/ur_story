@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { formatTime } from '../lib/format';
+import { PLAYBACK_RATES } from '../lib/playbackRates';
 import { usePlayer } from '../lib/PlayerProvider';
 import { cardShadow, colors, fonts, radius } from '../theme';
 
@@ -48,6 +49,24 @@ export function PlayerControls() {
         <Pressable accessibilityRole="button" accessibilityLabel="Forward 15 seconds" onPress={() => p.seekBy(15)} style={styles.skip}>
           <Text style={styles.skipText}>+15</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.sleepRow}>
+        <Text style={styles.sleepLabel}>Speed</Text>
+        <View style={styles.sleepChips}>
+          {PLAYBACK_RATES.map((rate) => (
+            <Pressable
+              key={rate}
+              accessibilityRole="button"
+              accessibilityLabel={`${rate}x speed`}
+              accessibilityState={{ selected: p.playbackRate === rate }}
+              onPress={() => p.setPlaybackRate(rate)}
+              style={[styles.chip, p.playbackRate === rate && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, p.playbackRate === rate && styles.chipTextActive]}>{rate}x</Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       <View style={styles.sleepRow}>
@@ -105,6 +124,8 @@ const styles = StyleSheet.create({
   sleepLabel: { color: colors.text, fontFamily: fonts.rounded, fontSize: 15, fontWeight: '700' },
   sleepChips: { flexDirection: 'row', gap: 8 },
   chip: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: radius.pill,
