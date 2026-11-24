@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import { resolveUrl } from './catalog';
+import { FADE_MS } from './fade';
 import { useLibrary } from './LibraryProvider';
 import { DEFAULT_RATE } from './playbackRates';
 import { useProfiles } from './ProfilesProvider';
@@ -25,12 +26,16 @@ type PlayerContextValue = {
   error: string | null;
   play: (story: Story) => void;
   toggle: () => void;
+  /** Pauses unconditionally, unlike `toggle`, which flips whatever the native player is doing right now. */
+  pause: () => void;
   seekBy: (seconds: number) => void;
   seekTo: (seconds: number) => void;
   /** Minutes the timer was set to, or null when off. */
   sleepMinutes: number | null;
   sleepRemainingSec: number | null;
   setSleepTimer: (minutes: number | null) => void;
+  /** Fades the volume over the last seconds before `endsAt` (epoch ms), then pauses. Replaces any sleep timer. */
+  fadeOutAndPause: (endsAt: number) => void;
   playbackRate: number;
   setPlaybackRate: (rate: number) => void;
 };
@@ -39,7 +44,6 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 const PROGRESS_SAVE_INTERVAL_MS = 5000;
 const SLEEP_TICK_MS = 1000;
-const FADE_MS = 10_000;
 const FADE_TICK_MS = 250;
 
 // expo-audio exposes volume as a plain property; keep the assignment out of the component body.
@@ -170,6 +174,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setSleepRemainingSec(minutes ? minutes * 60 : null);
   }, []);
 
+  // Reuses the sleep timer's fade effect below, so a bedtime session ends exactly like a sleep timer does.
+  const fadeOutAndPause = useCallback((endsAt: number) => {
+    setSleepMinutes(null);
+    setSleepEndsAt(endsAt);
+    setSleepRemainingSec(Math.max(0, Math.round((endsAt - Date.now()) / 1000)));
+  }, []);
+
   // Fade the volume out over the last FADE_MS, then pause. The cleanup restores full volume on every
   // way out: timer cleared or replaced, profile switch, unmount, and the natural end.
   useEffect(() => {
@@ -217,6 +228,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     else player.play();
   }, [player]);
 
+  const pause = useCallback(() => {
+    player.pause();
+  }, [player]);
+
   const seekTo = useCallback(
     (seconds: number) => {
       player.seekTo(Math.max(0, seconds)).catch(() => {});
@@ -242,15 +257,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       error,
       play,
       toggle,
+      pause,
       seekBy,
       seekTo,
       sleepMinutes,
       sleepRemainingSec,
       setSleepTimer,
+      fadeOutAndPause,
       playbackRate,
       setPlaybackRate,
     }),
-    [current, status, error, play, toggle, seekBy, seekTo, sleepMinutes, sleepRemainingSec, setSleepTimer, playbackRate, setPlaybackRate],
+    [current, status, error, play, toggle, pause, seekBy, seekTo, sleepMinutes, sleepRemainingSec, setSleepTimer, fadeOutAndPause, playbackRate, setPlaybackRate],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

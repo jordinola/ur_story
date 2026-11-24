@@ -2,10 +2,12 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
+import { BedtimeLock } from '../components/BedtimeLock';
 import { HeaderLogo } from '../components/HeaderLogo';
 import { MiniPlayer } from '../components/MiniPlayer';
 import { ProfileMenu } from '../components/ProfileMenu';
 import { SplashGate } from '../components/SplashGate';
+import { BedtimeProvider } from '../lib/BedtimeProvider';
 import { LibraryProvider } from '../lib/LibraryProvider';
 import { PlayerProvider } from '../lib/PlayerProvider';
 import { ProfilesProvider } from '../lib/ProfilesProvider';
@@ -23,26 +25,29 @@ export default function RootLayout() {
     <ProfilesProvider>
       <LibraryProvider>
         <PlayerProvider>
-          <SplashGate />
-          <StatusBar style="dark" />
-          <View style={{ flex: 1, backgroundColor: colors.bg }}>
-            <View style={{ flex: 1 }}>
-              <Stack
-                screenOptions={{
-                  headerStyle: { backgroundColor: colors.bg },
-                  headerTintColor: colors.text,
-                  headerTitleStyle: { fontFamily: fonts.rounded, fontWeight: '700' },
-                  headerShadowVisible: false,
-                  contentStyle: { backgroundColor: colors.bg },
-                }}
-              >
-                <Stack.Screen name="index" options={{ title: 'UR Story', headerTitle: () => <HeaderLogo />, headerRight: () => <ProfileMenu /> }} />
-                <Stack.Screen name="story/[id]" options={{ title: '', headerBackTitle: 'Stories' }} />
-                <Stack.Screen name="profiles" options={{ presentation: 'modal', headerShown: false }} />
-              </Stack>
+          <BedtimeProvider>
+            <SplashGate />
+            <StatusBar style="dark" />
+            <View style={{ flex: 1, backgroundColor: colors.bg }}>
+              <View style={{ flex: 1 }}>
+                <Stack
+                  screenOptions={{
+                    headerStyle: { backgroundColor: colors.bg },
+                    headerTintColor: colors.text,
+                    headerTitleStyle: { fontFamily: fonts.rounded, fontWeight: '700' },
+                    headerShadowVisible: false,
+                    contentStyle: { backgroundColor: colors.bg },
+                  }}
+                >
+                  <Stack.Screen name="index" options={{ title: 'UR Story', headerTitle: () => <HeaderLogo />, headerRight: () => <ProfileMenu /> }} />
+                  <Stack.Screen name="story/[id]" options={{ title: '', headerBackTitle: 'Stories' }} />
+                  <Stack.Screen name="profiles" options={{ presentation: 'modal', headerShown: false }} />
+                </Stack>
+              </View>
+              <MiniPlayer />
+              <BedtimeLock />
             </View>
-            <MiniPlayer />
-          </View>
+          </BedtimeProvider>
         </PlayerProvider>
       </LibraryProvider>
     </ProfilesProvider>

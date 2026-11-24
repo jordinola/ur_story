@@ -336,6 +336,17 @@ describe('PlayerProvider', () => {
     });
   });
 
+  describe('pause', () => {
+    it('pauses even when the native player has not reported playing yet', async () => {
+      const { result } = await setup();
+
+      await act(async () => result.current.pause());
+
+      expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.play).not.toHaveBeenCalled();
+    });
+  });
+
   describe('sleep timer', () => {
     it('counts down and reports remaining seconds', async () => {
       const { result } = await setup();
@@ -369,6 +380,56 @@ describe('PlayerProvider', () => {
       expect(result.current.sleepMinutes).toBeNull();
       expect(result.current.sleepRemainingSec).toBeNull();
       expect(mockPlayer.pause).not.toHaveBeenCalled();
+    });
+
+    describe('fadeOutAndPause', () => {
+      it('lowers the volume over the last 10 seconds then pauses at the end time', async () => {
+        setStatus({ playing: true });
+        const { result } = await setup();
+        await act(async () => result.current.fadeOutAndPause(Date.now() + 30_000));
+
+        await act(async () => jest.advanceTimersByTime(15_000));
+        expect(mockPlayer.volume).toBe(1);
+
+        await act(async () => jest.advanceTimersByTime(10_000));
+        expect(mockPlayer.volume).toBeCloseTo(0.5, 1);
+        expect(mockPlayer.pause).not.toHaveBeenCalled();
+
+        await act(async () => jest.advanceTimersByTime(6_000));
+        expect(mockPlayer.pause).toHaveBeenCalled();
+      });
+
+      it('pauses on the next tick when the end time is already past', async () => {
+        const { result } = await setup();
+
+        await act(async () => result.current.fadeOutAndPause(Date.now() - 5_000));
+        await act(async () => jest.advanceTimersByTime(1_000));
+
+        expect(mockPlayer.pause).toHaveBeenCalled();
+      });
+
+      it('replaces a running sleep timer', async () => {
+        const { result } = await setup();
+        await act(async () => result.current.setSleepTimer(20));
+
+        await act(async () => result.current.fadeOutAndPause(Date.now() + 5_000));
+
+        expect(result.current.sleepMinutes).toBeNull();
+        expect(result.current.sleepRemainingSec).toBe(5);
+        await act(async () => jest.advanceTimersByTime(6_000));
+        expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+      });
+
+      it('restores full volume after the pause', async () => {
+        setStatus({ playing: true });
+        const { result } = await setup();
+        await act(async () => result.current.fadeOutAndPause(Date.now() + 12_000));
+
+        await act(async () => jest.advanceTimersByTime(13_000));
+
+        expect(mockPlayer.pause).toHaveBeenCalled();
+        expect(mockPlayer.volume).toBe(1);
+      });
     });
 
     describe('fade-out', () => {

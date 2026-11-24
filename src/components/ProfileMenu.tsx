@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -12,10 +12,12 @@ import {
   type HostInstance,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBedtime } from '../lib/BedtimeProvider';
 import { useProfiles } from '../lib/ProfilesProvider';
 import { useReduceMotion } from '../lib/useReduceMotion';
 import { cardShadow, colors, fonts, radius } from '../theme';
 import { Avatar } from './Avatar';
+import { ParentalGate } from './ParentalGate';
 
 // SDK 58 docs: @expo/ui ContextMenu is iOS-only SwiftUI and not a dependency here, so a themed Modal popover is used.
 const FALLBACK_HEADER_HEIGHT = 44;
@@ -31,22 +33,40 @@ export function ProfileMenu() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
+  const { active: bedtimeActive, locked } = useBedtime();
   const [open, setOpen] = useState(false);
+  // The profile a grown-up still has to approve switching to during a bedtime session.
+  const [gateFor, setGateFor] = useState<string | null>(null);
   const [triggerBox, setTriggerBox] = useState<TriggerBox | null>(null);
   const triggerRef = useRef<HostInstance>(null);
   // A navigation waits here until the Modal has finished dismissing, or iOS can drop the push.
   const pendingHref = useRef<Href | null>(null);
+  const pendingSwitch = useRef<string | null>(null);
 
-  const flushPending = () => {
+  const flushPending = useCallback(() => {
     const href = pendingHref.current;
+    const switchId = pendingSwitch.current;
     pendingHref.current = null;
+    pendingSwitch.current = null;
+    if (locked) return;
     if (href) router.push(href);
-  };
+    if (switchId) setGateFor(switchId);
+  }, [locked]);
+
+  // The lock overlay must not end up under the menu or its gate, so close both when it appears.
+  const [wasLocked, setWasLocked] = useState(locked);
+  if (locked !== wasLocked) {
+    setWasLocked(locked);
+    if (locked) {
+      setOpen(false);
+      setGateFor(null);
+    }
+  }
 
   // Modal onDismiss only fires on iOS, so other platforms push as soon as the menu has closed.
   useEffect(() => {
     if (!open && Platform.OS !== 'ios') flushPending();
-  }, [open]);
+  }, [open, flushPending]);
 
   const openMenu = () => {
     triggerRef.current?.measureInWindow((x, y, width, height) => setTriggerBox({ x, y, width, height }));
@@ -54,8 +74,13 @@ export function ProfileMenu() {
   };
   const close = () => setOpen(false);
   const choose = (id: string) => {
-    setActive(id);
+    if (bedtimeActive && id !== activeId) pendingSwitch.current = id;
+    else setActive(id);
     close();
+  };
+  const passGate = () => {
+    if (gateFor) setActive(gateFor);
+    setGateFor(null);
   };
   const go = (href: Href) => {
     pendingHref.current = href;
@@ -156,6 +181,16 @@ export function ProfileMenu() {
           </View>
         </View>
       </Modal>
+      {gateFor ? (
+        <Modal
+          visible
+          animationType={reduceMotion ? 'none' : 'slide'}
+          onRequestClose={() => setGateFor(null)}
+          supportedOrientations={['portrait', 'landscape']}
+        >
+          <ParentalGate onPass={passGate} onCancel={() => setGateFor(null)} />
+        </Modal>
+      ) : null}
     </>
   );
 }

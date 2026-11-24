@@ -16,6 +16,12 @@ const mockProfiles = {
 };
 
 jest.mock('../lib/ProfilesProvider', () => ({ useProfiles: () => mockProfiles }));
+
+const mockBedtime = { active: false, locked: false };
+jest.mock('../lib/BedtimeProvider', () => ({ useBedtime: () => mockBedtime }));
+jest.mock('../lib/gateQuestion', () => ({
+  makeGateQuestion: () => ({ prompt: 'What is 6 × 7?', answer: 42, options: [35, 42, 48, 49] }),
+}));
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
@@ -29,6 +35,8 @@ beforeEach(() => {
   mockProfiles.profiles = [mia, leo];
   mockProfiles.activeProfile = mia;
   mockProfiles.activeId = 'a';
+  mockBedtime.active = false;
+  mockBedtime.locked = false;
 });
 
 const modalProps: { current: ModalProps | null } = { current: null };
@@ -181,5 +189,72 @@ describe('ProfileMenu', () => {
 
     // top = 60 + 44 + 8 gap; right = 390 window width - (300 + 44)
     expect(screen.getByTestId('profile-menu-anchor')).toHaveStyle({ top: 112, right: 46 });
+  });
+});
+
+describe('ProfileMenu during a bedtime session', () => {
+  it('switches profiles straight away when no session is running', async () => {
+    await open();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Leo' }));
+
+    expect(mockProfiles.setActive).toHaveBeenCalledWith('b');
+  });
+
+  it('asks the grown-ups gate before switching while a session runs', async () => {
+    mockBedtime.active = true;
+    await open();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Leo' }));
+    await finishDismiss();
+
+    expect(mockProfiles.setActive).not.toHaveBeenCalled();
+    expect(screen.getByText('Grown-ups only')).toBeOnTheScreen();
+  });
+
+  it('switches once the gate is passed', async () => {
+    mockBedtime.active = true;
+    await open();
+    await fireEvent.press(screen.getByRole('button', { name: 'Leo' }));
+    await finishDismiss();
+
+    await fireEvent.press(screen.getByRole('button', { name: '42' }));
+
+    expect(mockProfiles.setActive).toHaveBeenCalledWith('b');
+    expect(screen.queryByText('Grown-ups only')).not.toBeOnTheScreen();
+  });
+
+  it('keeps the current profile when the gate is cancelled', async () => {
+    mockBedtime.active = true;
+    await open();
+    await fireEvent.press(screen.getByRole('button', { name: 'Leo' }));
+    await finishDismiss();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(mockProfiles.setActive).not.toHaveBeenCalled();
+    expect(screen.queryByText('Grown-ups only')).not.toBeOnTheScreen();
+  });
+
+  it('does not ask the gate for the profile that is already active', async () => {
+    mockBedtime.active = true;
+    await open();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Mia' }));
+
+    expect(mockProfiles.setActive).toHaveBeenCalledWith('a');
+    expect(screen.queryByText('Grown-ups only')).not.toBeOnTheScreen();
+  });
+
+  it('closes the menu when the app locks', async () => {
+    mockBedtime.active = true;
+    const { rerender } = await render(<ProfileMenu />);
+    await fireEvent.press(screen.getByLabelText('Profile menu for Mia'));
+    expect(screen.getByRole('button', { name: 'Leo' })).toBeOnTheScreen();
+
+    mockBedtime.locked = true;
+    await rerender(<ProfileMenu />);
+
+    expect(screen.queryByRole('button', { name: 'Leo' })).not.toBeOnTheScreen();
   });
 });

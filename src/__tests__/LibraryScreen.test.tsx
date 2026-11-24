@@ -36,6 +36,9 @@ const mockProfiles: { ready: boolean; activeProfile: Profile | null } = { ready:
 jest.mock('../lib/LibraryProvider', () => ({ useLibrary: () => mockLibrary }));
 jest.mock('../lib/ProfilesProvider', () => ({ useProfiles: () => mockProfiles }));
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
+jest.mock('../lib/BedtimeProvider', () => ({
+  useBedtime: () => ({ active: false, remainingSec: null, startBedtime: jest.fn(), endBedtime: jest.fn() }),
+}));
 
 function setWidth(width: number) {
   jest.spyOn(RN, 'useWindowDimensions').mockReturnValue({ width, height: 800, scale: 2, fontScale: 1 });
@@ -56,6 +59,12 @@ beforeEach(() => {
 const mia: Profile = { id: 'p1', name: 'Mia', age: 5, tags: ['animals'], languages: ['en'], color: '#1D4ED8' };
 
 describe('LibraryScreen', () => {
+  it('shows the Bedtime chip', async () => {
+    await render(<LibraryScreen />);
+
+    expect(screen.getByRole('button', { name: 'Bedtime' })).toBeOnTheScreen();
+  });
+
   it('lists all stories by default', async () => {
     await render(<LibraryScreen />);
 

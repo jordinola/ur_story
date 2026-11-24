@@ -6,9 +6,9 @@ import { cardShadow, colors, fonts, radius } from '../theme';
 
 const RETRY_MESSAGE = 'Not quite. Here is a new one!';
 
-type Props = { onPass: () => void; onCancel: () => void };
+type Props = { onPass: () => void; onCancel: () => void; hideCancel?: boolean };
 
-export function ParentalGate({ onPass, onCancel }: Props) {
+export function ParentalGate({ onPass, onCancel, hideCancel = false }: Props) {
   const insets = useSafeAreaInsets();
   const [question, setQuestion] = useState(() => makeGateQuestion());
   const [retry, setRetry] = useState(false);
@@ -55,9 +55,11 @@ export function ParentalGate({ onPass, onCancel }: Props) {
           </Pressable>
         ))}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={onCancel} style={styles.cancel}>
-        <Text style={styles.cancelText}>Cancel</Text>
-      </Pressable>
+      {hideCancel ? null : (
+        <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={onCancel} style={styles.cancel}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
