@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddProfileCard } from '../components/AddProfileCard';
+import { BedtimeEntry } from '../components/BedtimeEntry';
 import { SkeletonCard } from '../components/SkeletonCard';
 import { StoryCard } from '../components/StoryCard';
 import { StoryRow } from '../components/StoryRow';
@@ -123,6 +124,7 @@ export default function LibraryScreen() {
             </Text>
           </Pressable>
         ))}
+        <BedtimeEntry />
       </View>
       <FlatList
         key={columns} // numColumns can't change on a mounted list

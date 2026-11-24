@@ -41,6 +41,12 @@ describe('ParentalGate', () => {
     }
   });
 
+  it('hideCancel removes the Cancel button', async () => {
+    await render(<ParentalGate onPass={jest.fn()} onCancel={jest.fn()} hideCancel />);
+
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeOnTheScreen();
+  });
+
   it('calls onPass for the correct answer', async () => {
     const { onPass, onCancel } = await renderGate();
 
