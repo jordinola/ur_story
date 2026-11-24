@@ -15,6 +15,7 @@ Stack: Expo SDK 58, React Native 0.88, React 19, TypeScript, Expo Router (`src/a
 5. **Tests with every change.** As much coverage as is practical (see section 4).
 6. **Don't trust memory for Expo APIs.** They change every SDK. Read the `expo` major version in `package.json` and check `https://docs.expo.dev/versions/v<major>.0.0/` (or `https://docs.expo.dev/llms.txt`) before touching any Expo, EAS, or React Native API.
 7. **Use the available skills and agents** before, during, and after coding (see section 4.4). They are part of the standard, not an optional extra.
+8. **Every idea and ticket lives on the Trello board** and moves through its columns as the work progresses (see section 12). Nothing worth keeping stays only in a chat.
 
 ---
 
@@ -27,11 +28,11 @@ main ──► branch ──► design + plan ──► code + tests ──► r
 ```
 
 1. Update `main` and branch from it.
-2. Brainstorm and plan (section 4.4). The spec and plan are written into the repo.
-3. Write a failing test, then the code (TDD where practical).
-4. Run the skill and agent reviews (section 4.4), then the checks (section 4.3). All must pass.
+2. Brainstorm and plan (section 4.4). The spec and plan are written into the repo. Trello card: **Draft** during brainstorming, **To Do** once the plan is pushed (section 12).
+3. Write a failing test, then the code (TDD where practical). Card moves to **In Progress** when this starts.
+4. Run the skill and agent reviews (section 4.4), then the checks (section 4.3). All must pass. Card moves to **In Test**.
 5. Commit once, including the spec and plan files. Later changes **amend** that commit.
-6. Push and open the PR with the template (section 8).
+6. Push and open the PR with the template (section 8). The card gets the PR link. After the PR merges, the card moves to **Done**.
 
 ---
 
@@ -288,7 +289,7 @@ Copy into every PR:
 - [ ] `bug` Bug fix
 
 ## Related
-<!-- Issue, ticket, or discussion links. "None" if not applicable. -->
+<!-- Trello card link, plus any issue or discussion links. "None" if not applicable. -->
 
 ## Changes
 <!-- Mirror the commit body: one bullet per individual change. -->
@@ -347,6 +348,7 @@ A feature or bug is done only when:
 - [ ] The skill and agent steps in section 4.4 were done and their findings addressed
 - [ ] iOS best practices (section 5) were reviewed and UI was verified on simulator
 - [ ] The PR is open with the template filled in, and any review changes were amended into the single commit
+- [ ] The Trello card is in the right column and carries the PR link (section 12)
 - [ ] No unrelated changes slipped in
 
 ---
@@ -354,3 +356,63 @@ A feature or bug is done only when:
 ## 11. Keeping this document current
 
 Changing the workflow, stack, or standards is itself a change. Edit this file in a `feat` branch under the same rules, and update the pointer in `AGENTS.md` if the path changes.
+
+---
+
+## 12. Trello board workflow
+
+Board: **Ur Story** (https://trello.com/b/8fCrhHEu/ur-story), reached through the Trello MCP server. The goal is to persist ideas, refine them over several sessions, and never lose context between conversations.
+
+### 12.1 Columns
+
+| Column | A card is here when | Claude's action |
+| --- | --- | --- |
+| **Draft** | A brainstorm reached a solid point, or an idea is worth keeping but isn't ready to build | Create the card as soon as the brainstorm has substance. Update the same card as it evolves. Don't wait for the end. |
+| **To Do** | The brainstorm is finished and an implementation plan exists and is pushed | Move the card from Draft. Rewrite the description to the "ready" format (12.2) and add the plan link. |
+| **In Progress** | Implementation has started (branch created, first failing test or first code) | Move the card. Add the branch name. |
+| **In Test** | The work is complete and the checks and reviews pass, before the PR is created | Move the card. Add the manual verification notes (what was run on iPhone and iPad). |
+| **Done** | The PR is merged | Move the card (see 12.4). |
+
+Bugs use the same columns. A bug card in Draft holds the repro and suspected cause.
+
+### 12.2 Card content
+
+- **Title:** the commit subject without the type prefix, in plain words ("Add sleep timer presets").
+- **Label or prefix for type:** `feat` or `bug`.
+- **Draft card description:** purpose, who it's for, decisions made so far, open questions, rejected options and why. Written so a fresh session can resume the brainstorm from the card alone.
+- **To Do card description** (replace the draft text, keep the decisions):
+  - Purpose in 1-3 sentences
+  - Scope: what is in, what is explicitly out
+  - Plan: file path, branch, and link (12.3)
+  - Acceptance criteria
+- **Later columns** add: branch name (In Progress), verification notes (In Test), PR link (added right after the PR is opened; the card stays in In Test until the merge).
+- The card is the durable record. A link can break, so the description must make sense without following any link.
+
+### 12.3 Linking the plan (the push gap)
+
+Plans live in `docs/superpowers/plans/` and are committed in the branch's single commit (section 4.4). Until that commit is pushed there is no URL, and a plan is also deleted when the work ends, so a link alone is fragile. Handle it like this:
+
+1. Finish the brainstorm and write the spec and plan.
+2. Commit them as the branch's one commit (`feat: plan <feature>`), run the checks (they pass trivially for docs-only changes), and **push the branch**. No PR yet. This is allowed: later work is amended into the same commit and pushed with `--force-with-lease` (section 3.2).
+3. Put the branch link in the To Do card, for example `https://github.com/<owner>/ur_story/blob/<branch>/docs/superpowers/plans/<file>.md`, and also the plan's file name and a short summary of its steps in the description.
+4. Link by **branch**, not commit SHA. The SHA changes on every amend.
+5. When the plan file is deleted at the end (section 4.4), the link breaks. That is expected. The description keeps the summary and the spec stays in the repo.
+
+If pushing is not wanted yet, put the planned file path and a summary of the plan in the card, and add the link once the branch is pushed. Never block the move to To Do on the link.
+
+### 12.4 Done and merge visibility
+
+Claude can't see a merge happen on its own, so it checks at defined points:
+
+- At the start of any session that touches the board, run `gh pr list --state merged` and move In Test cards whose PR is merged to Done.
+- When the user says a PR was merged, move the card straight away.
+- A human can always move a card by hand. If a card's column disagrees with reality, reality wins and Claude corrects the card.
+
+### 12.5 Rules for Claude
+
+- Use the Trello MCP tools for the **Ur Story** board only. Don't touch other boards.
+- Create or move cards when the trigger in 12.1 happens, and say in one line what was done. Don't ask permission each time.
+- Search the board before creating a card, and update the existing card instead of making a duplicate.
+- Don't delete cards or archive lists. Moving a card back to an earlier column is fine when work is reopened.
+- Never put secrets or personal data in a card.
+- If the Trello server isn't connected, say so, carry on with the work, and note which card updates are pending.
