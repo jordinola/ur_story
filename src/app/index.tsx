@@ -9,7 +9,9 @@ import { StoryCard } from '../components/StoryCard';
 import { StoryRow } from '../components/StoryRow';
 import { useLibrary } from '../lib/LibraryProvider';
 import { useProfiles } from '../lib/ProfilesProvider';
+import { useQueue } from '../lib/QueueProvider';
 import { buildHomeSections } from '../lib/recommend';
+import { showStoryActions } from '../lib/storyActions';
 import { colors, fonts, MAX_CONTENT_WIDTH, radius } from '../theme';
 import type { Story } from '../types';
 
@@ -27,6 +29,7 @@ export default function LibraryScreen() {
   const landscape = width > height;
   const insets = useSafeAreaInsets();
   const { stories, loading, favorites, progress, completed, isFavorite, isCompleted, toggleFavorite } = useLibrary();
+  const { enqueue, playNext } = useQueue();
   const { ready: profilesReady, activeProfile } = useProfiles();
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -65,6 +68,9 @@ export default function LibraryScreen() {
       landscape={landscape}
       onPress={() => router.push({ pathname: '/story/[id]', params: { id: story.id } })}
       onToggleFavorite={() => toggleFavorite(story.id)}
+      onLongPress={() => showStoryActions(story, { onPlayNext: () => playNext(story), onAddToQueue: () => enqueue(story) })}
+      onPlayNext={() => playNext(story)}
+      onAddToQueue={() => enqueue(story)}
     />
   );
 

@@ -143,6 +143,17 @@ describe('PlayerProvider', () => {
       expect(mockPlayer.play).toHaveBeenCalledTimes(1);
     });
 
+    it('does not reload the same story when play is called twice before a re-render', async () => {
+      const { result } = await setup();
+
+      await act(async () => {
+        result.current.play(story);
+        result.current.play(story);
+      });
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+    });
+
     it('does nothing when the story is already playing', async () => {
       const { result } = await setup();
       await act(async () => result.current.play(story));
@@ -198,6 +209,34 @@ describe('PlayerProvider', () => {
       await act(async () => result.current.play(makeStory({ id: 'story-2' })));
 
       expect(result.current.error).toBeNull();
+    });
+  });
+
+  describe('play result', () => {
+    it('returns true on success', async () => {
+      const { result } = await setup();
+      let ok: boolean | undefined;
+
+      await act(async () => {
+        ok = result.current.play(story);
+      });
+
+      expect(ok).toBe(true);
+    });
+
+    it('returns false and sets error when the player throws', async () => {
+      mockPlayer.replace.mockImplementationOnce(() => {
+        throw new Error('boom');
+      });
+      const { result } = await setup();
+      let ok: boolean | undefined;
+
+      await act(async () => {
+        ok = result.current.play(story);
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.error).toMatch(/Could not load this story/);
     });
   });
 
@@ -298,6 +337,35 @@ describe('PlayerProvider', () => {
     });
   });
 
+  describe('finishCount', () => {
+    it('increments once when a story finishes', async () => {
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+      expect(result.current.finishCount).toBe(0);
+
+      setStatus({ currentTime: 300, didJustFinish: true });
+      await rerender({});
+      await rerender({});
+
+      expect(result.current.finishCount).toBe(1);
+    });
+
+    it("increments again for the next story's finish", async () => {
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+      setStatus({ didJustFinish: true });
+      await rerender({});
+      setStatus({ didJustFinish: false });
+      await rerender({});
+      await act(async () => result.current.play(makeStory({ id: 'story-2' })));
+
+      setStatus({ didJustFinish: true });
+      await rerender({});
+
+      expect(result.current.finishCount).toBe(2);
+    });
+  });
+
   describe('playback speed', () => {
     it('defaults to 1x', async () => {
       const { result } = await setup();
@@ -368,6 +436,26 @@ describe('PlayerProvider', () => {
       expect(mockPlayer.pause).toHaveBeenCalled();
       expect(result.current.sleepMinutes).toBeNull();
       expect(result.current.sleepRemainingSec).toBeNull();
+    });
+
+    it('increments sleepExpiredCount when the timer reaches zero', async () => {
+      const { result } = await setup();
+      await act(async () => result.current.setSleepTimer(10));
+      expect(result.current.sleepExpiredCount).toBe(0);
+
+      await act(async () => jest.advanceTimersByTime(10 * 60_000 + 1000));
+
+      expect(result.current.sleepExpiredCount).toBe(1);
+    });
+
+    it('leaves sleepExpiredCount alone when the timer is cleared early', async () => {
+      const { result } = await setup();
+      await act(async () => result.current.setSleepTimer(10));
+
+      await act(async () => result.current.setSleepTimer(null));
+      await act(async () => jest.advanceTimersByTime(10 * 60_000 + 1000));
+
+      expect(result.current.sleepExpiredCount).toBe(0);
     });
 
     it('can be cancelled', async () => {

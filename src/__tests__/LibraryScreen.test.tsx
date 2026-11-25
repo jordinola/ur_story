@@ -35,6 +35,8 @@ const mockProfiles: { ready: boolean; activeProfile: Profile | null } = { ready:
 
 jest.mock('../lib/LibraryProvider', () => ({ useLibrary: () => mockLibrary }));
 jest.mock('../lib/ProfilesProvider', () => ({ useProfiles: () => mockProfiles }));
+const mockQueue = { enqueue: jest.fn(), playNext: jest.fn() };
+jest.mock('../lib/QueueProvider', () => ({ useQueue: () => mockQueue }));
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('../lib/BedtimeProvider', () => ({
   useBedtime: () => ({ active: false, remainingSec: null, startBedtime: jest.fn(), endBedtime: jest.fn() }),
@@ -59,6 +61,24 @@ beforeEach(() => {
 const mia: Profile = { id: 'p1', name: 'Mia', age: 5, tags: ['animals'], languages: ['en'], color: '#1D4ED8' };
 
 describe('LibraryScreen', () => {
+  it('long-press then Add to queue adds the story to the queue', async () => {
+    jest.spyOn(RN.ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_options, callback) => callback(1));
+    await render(<LibraryScreen />);
+
+    await fireEvent(screen.getByRole('button', { name: /^Story B,/ }), 'longPress');
+
+    expect(mockQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }));
+  });
+
+  it('tapping More actions then Add to queue adds the story to the queue', async () => {
+    jest.spyOn(RN.ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_options, callback) => callback(1));
+    await render(<LibraryScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'More actions for Story B' }));
+
+    expect(mockQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }));
+  });
+
   it('shows the Bedtime chip', async () => {
     await render(<LibraryScreen />);
 
@@ -82,7 +102,7 @@ describe('LibraryScreen', () => {
   it('opens a story when its card is tapped', async () => {
     await render(<LibraryScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: /Story B/ }));
+    await fireEvent.press(screen.getByRole('button', { name: /^Story B,/ }));
 
     expect(router.push).toHaveBeenCalledWith({ pathname: '/story/[id]', params: { id: 'b' } });
   });

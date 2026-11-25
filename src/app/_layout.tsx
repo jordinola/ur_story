@@ -11,6 +11,7 @@ import { BedtimeProvider } from '../lib/BedtimeProvider';
 import { LibraryProvider } from '../lib/LibraryProvider';
 import { PlayerProvider } from '../lib/PlayerProvider';
 import { ProfilesProvider } from '../lib/ProfilesProvider';
+import { QueueProvider } from '../lib/QueueProvider';
 import { colors, fonts } from '../theme';
 
 // Keep the native splash up (called at module scope so it runs before first render) until SplashGate hides it.
@@ -26,27 +27,29 @@ export default function RootLayout() {
       <LibraryProvider>
         <PlayerProvider>
           <BedtimeProvider>
-            <SplashGate />
-            <StatusBar style="dark" />
-            <View style={{ flex: 1, backgroundColor: colors.bg }}>
-              <View style={{ flex: 1 }}>
-                <Stack
-                  screenOptions={{
-                    headerStyle: { backgroundColor: colors.bg },
-                    headerTintColor: colors.text,
-                    headerTitleStyle: { fontFamily: fonts.rounded, fontWeight: '700' },
-                    headerShadowVisible: false,
-                    contentStyle: { backgroundColor: colors.bg },
-                  }}
-                >
-                  <Stack.Screen name="index" options={{ title: 'UR Story', headerTitle: () => <HeaderLogo />, headerRight: () => <ProfileMenu /> }} />
-                  <Stack.Screen name="story/[id]" options={{ title: '', headerBackTitle: 'Stories' }} />
-                  <Stack.Screen name="profiles" options={{ presentation: 'modal', headerShown: false }} />
-                </Stack>
+            <QueueProvider>
+              <SplashGate />
+              <StatusBar style="dark" />
+              <View style={{ flex: 1, backgroundColor: colors.bg }}>
+                <View style={{ flex: 1 }}>
+                  <Stack
+                    screenOptions={{
+                      headerStyle: { backgroundColor: colors.bg },
+                      headerTintColor: colors.text,
+                      headerTitleStyle: { fontFamily: fonts.rounded, fontWeight: '700' },
+                      headerShadowVisible: false,
+                      contentStyle: { backgroundColor: colors.bg },
+                    }}
+                  >
+                    <Stack.Screen name="index" options={{ title: 'UR Story', headerTitle: () => <HeaderLogo />, headerRight: () => <ProfileMenu /> }} />
+                    <Stack.Screen name="story/[id]" options={{ title: '', headerBackTitle: 'Stories' }} />
+                    <Stack.Screen name="profiles" options={{ presentation: 'modal', headerShown: false }} />
+                  </Stack>
+                </View>
+                <MiniPlayer />
+                <BedtimeLock />
               </View>
-              <MiniPlayer />
-              <BedtimeLock />
-            </View>
+            </QueueProvider>
           </BedtimeProvider>
         </PlayerProvider>
       </LibraryProvider>

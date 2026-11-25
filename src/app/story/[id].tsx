@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlayerControls } from '../../components/PlayerControls';
+import { UpNextBanner } from '../../components/UpNextBanner';
+import { UpNextList } from '../../components/UpNextList';
 import { resolveUrl } from '../../lib/catalog';
 import { formatMinutes } from '../../lib/format';
 import { useLibrary } from '../../lib/LibraryProvider';
@@ -73,7 +75,9 @@ export default function StoryScreen() {
         </Pressable>
       </View>
       <Text style={styles.description}>{story.description}</Text>
+      <UpNextBanner />
       <PlayerControls />
+      <UpNextList />
     </View>
   );
 

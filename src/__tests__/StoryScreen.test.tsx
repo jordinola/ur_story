@@ -31,6 +31,16 @@ const mockPlayer = {
 };
 
 jest.mock('../lib/LibraryProvider', () => ({ useLibrary: () => mockLibrary }));
+jest.mock('../lib/QueueProvider', () => ({
+  useQueue: () => ({
+    queue: [],
+    upNext: null,
+    gapRemainingSec: null,
+    cancelUpNext: jest.fn(),
+    moveToTop: jest.fn(),
+    remove: jest.fn(),
+  }),
+}));
 jest.mock('../lib/PlayerProvider', () => ({ usePlayer: () => mockPlayer }));
 jest.mock('expo-router', () => ({
   useLocalSearchParams: jest.fn(),
@@ -61,6 +71,12 @@ describe('StoryScreen', () => {
     expect(screen.getByRole('button', { name: 'Play' })).toBeOnTheScreen();
   });
 
+  it('shows the up next list below the player controls', async () => {
+    await render(<StoryScreen />);
+
+    expect(screen.getByRole('header', { name: 'Up next' })).toBeOnTheScreen();
+  });
+
   it('starts playing a story that is not already loaded', async () => {
     await render(<StoryScreen />);
 
@@ -71,6 +87,21 @@ describe('StoryScreen', () => {
     mockPlayer.current = story;
     await render(<StoryScreen />);
 
+    expect(mockPlayer.play).not.toHaveBeenCalled();
+  });
+
+  it('does not call play again after the route param changes to the already-playing story', async () => {
+    const next = makeStory({ id: 'story-2', title: 'Brave Bear' });
+    mockLibrary.stories = [story, next];
+    mockLibrary.getStory.mockImplementation((id: string) => [story, next].find((s) => s.id === id));
+    mockPlayer.current = story;
+    const { rerender } = await render(<StoryScreen />);
+
+    mockPlayer.current = next;
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'story-2' });
+    await rerender(<StoryScreen />);
+
+    expect(screen.getByText('Brave Bear')).toBeOnTheScreen();
     expect(mockPlayer.play).not.toHaveBeenCalled();
   });
 

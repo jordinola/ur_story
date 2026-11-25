@@ -85,7 +85,7 @@ describe('StoryCard', () => {
   it('calls onPress when the card is tapped', async () => {
     const { onPress } = await renderCard();
 
-    await fireEvent.press(screen.getByRole('button', { name: /The Sleepy Moon/ }));
+    await fireEvent.press(screen.getByRole('button', { name: /^The Sleepy Moon,/ }));
 
     expect(onPress).toHaveBeenCalledTimes(1);
   });
@@ -114,5 +114,72 @@ describe('StoryCard', () => {
 
     expect(onToggleFavorite).toHaveBeenCalledTimes(1);
     expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('calls onLongPress when the card is long-pressed', async () => {
+    const onLongPress = jest.fn();
+    await renderCard({ onLongPress });
+
+    await fireEvent(screen.getByRole('button', { name: /^The Sleepy Moon,/ }), 'longPress');
+
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes Play next and Add to queue as accessibility actions', async () => {
+    const onPlayNext = jest.fn();
+    const onAddToQueue = jest.fn();
+    await renderCard({ onPlayNext, onAddToQueue });
+    const card = screen.getByRole('button', { name: /^The Sleepy Moon,/ });
+
+    expect(card.props.accessibilityActions).toEqual([
+      { name: 'playNext', label: 'Play next' },
+      { name: 'addToQueue', label: 'Add to queue' },
+    ]);
+    await fireEvent(card, 'accessibilityAction', { nativeEvent: { actionName: 'playNext' } });
+    await fireEvent(card, 'accessibilityAction', { nativeEvent: { actionName: 'addToQueue' } });
+    expect(onPlayNext).toHaveBeenCalledTimes(1);
+    expect(onAddToQueue).toHaveBeenCalledTimes(1);
+  });
+
+  describe('more actions button', () => {
+    it('renders with the story title in its label when onLongPress is provided', async () => {
+      await renderCard({ onLongPress: jest.fn() });
+
+      expect(screen.getByRole('button', { name: 'More actions for The Sleepy Moon' })).toBeOnTheScreen();
+    });
+
+    it('calls onLongPress once without triggering the card press', async () => {
+      const onLongPress = jest.fn();
+      const { onPress } = await renderCard({ onLongPress });
+
+      await fireEvent.press(screen.getByRole('button', { name: 'More actions for The Sleepy Moon' }));
+
+      expect(onLongPress).toHaveBeenCalledTimes(1);
+      expect(onPress).not.toHaveBeenCalled();
+    });
+
+    it('is absent when onLongPress is not provided', async () => {
+      await renderCard();
+
+      expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeOnTheScreen();
+    });
+
+    it('leaves the favorite button working alongside it', async () => {
+      const { onToggleFavorite } = await renderCard({ onLongPress: jest.fn() });
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Add to favorites' }));
+
+      expect(onToggleFavorite).toHaveBeenCalledTimes(1);
+    });
+
+    it('has a touch target of at least 44pt', async () => {
+      await renderCard({ onLongPress: jest.fn() });
+      const button = screen.getByRole('button', { name: 'More actions for The Sleepy Moon' });
+      const { width, height } = StyleSheet.flatten(button.props.style);
+      const slop = button.props.hitSlop;
+
+      expect(width + (slop?.left ?? 0) + (slop?.right ?? 0)).toBeGreaterThanOrEqual(44);
+      expect(height + (slop?.top ?? 0) + (slop?.bottom ?? 0)).toBeGreaterThanOrEqual(44);
+    });
   });
 });

@@ -24,7 +24,8 @@ type PlayerContextValue = {
   position: number;
   duration: number;
   error: string | null;
-  play: (story: Story) => void;
+  /** False only when loading the story failed (`error` is set); a resume of the current story is true. */
+  play: (story: Story) => boolean;
   toggle: () => void;
   /** Pauses unconditionally, unlike `toggle`, which flips whatever the native player is doing right now. */
   pause: () => void;
@@ -36,6 +37,10 @@ type PlayerContextValue = {
   setSleepTimer: (minutes: number | null) => void;
   /** Fades the volume over the last seconds before `endsAt` (epoch ms), then pauses. Replaces any sleep timer. */
   fadeOutAndPause: (endsAt: number) => void;
+  /** Bumped once per natural story finish, so a queue can react to each one. */
+  finishCount: number;
+  /** Bumped when a sleep timer or bedtime fade runs out, so a queue can stop instead of advancing. */
+  sleepExpiredCount: number;
   playbackRate: number;
   setPlaybackRate: (rate: number) => void;
 };
@@ -63,6 +68,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [sleepMinutes, setSleepMinutes] = useState<number | null>(null);
   const [sleepEndsAt, setSleepEndsAt] = useState<number | null>(null);
   const [sleepRemainingSec, setSleepRemainingSec] = useState<number | null>(null);
+  const [finishCount, setFinishCount] = useState(0);
+  const [sleepExpiredCount, setSleepExpiredCount] = useState(0);
 
   const pendingSeek = useRef<number | null>(null);
   const currentRef = useRef<Story | null>(null);
@@ -98,9 +105,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     (story: Story) => {
       if (currentRef.current?.id === story.id) {
         if (!player.playing) player.play();
-        return;
+        return true;
       }
       setError(null);
+      // Sync ref so a same-story play() before the commit (e.g. a setParams render) is a resume.
+      currentRef.current = story;
       setCurrent(story);
       setRate(DEFAULT_RATE);
       restoreVolume();
@@ -115,8 +124,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           albumTitle: 'Bedtime stories',
         });
         player.play();
+        return true;
       } catch {
         setError('Could not load this story. Check your connection and the audio URL.');
+        return false;
       }
     },
     [player, getProgress, restoreVolume],
@@ -164,7 +175,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [status.playing, status.didJustFinish, saveProgress]);
 
   useEffect(() => {
-    if (status.didJustFinish && currentRef.current) markCompleted(currentRef.current.id);
+    if (!status.didJustFinish || !currentRef.current) return;
+    markCompleted(currentRef.current.id);
+    setFinishCount((n) => n + 1);
   }, [status.didJustFinish, markCompleted]);
 
   // Sleep timer.
@@ -197,6 +210,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setSleepMinutes(null);
         setSleepEndsAt(null);
         setSleepRemainingSec(null);
+        setSleepExpiredCount((n) => n + 1);
         return;
       }
       setSleepRemainingSec(Math.round(remainingMs / 1000));
@@ -264,10 +278,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       sleepRemainingSec,
       setSleepTimer,
       fadeOutAndPause,
+      finishCount,
+      sleepExpiredCount,
       playbackRate,
       setPlaybackRate,
     }),
-    [current, status, error, play, toggle, pause, seekBy, seekTo, sleepMinutes, sleepRemainingSec, setSleepTimer, fadeOutAndPause, playbackRate, setPlaybackRate],
+    [current, status, error, play, toggle, pause, seekBy, seekTo, sleepMinutes, sleepRemainingSec, setSleepTimer, fadeOutAndPause, finishCount, sleepExpiredCount, playbackRate, setPlaybackRate],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

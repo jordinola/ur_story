@@ -11,6 +11,13 @@ const mockPlayer = {
   toggle: jest.fn(),
 };
 
+const mockQueue = {
+  upNext: null as ReturnType<typeof makeStory> | null,
+  gapRemainingSec: null as number | null,
+  cancelUpNext: jest.fn(),
+};
+
+jest.mock('../lib/QueueProvider', () => ({ useQueue: () => mockQueue }));
 jest.mock('../lib/PlayerProvider', () => ({ usePlayer: () => mockPlayer }));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn() },
@@ -21,6 +28,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockPlayer.current = makeStory();
   mockPlayer.isPlaying = false;
+  mockQueue.upNext = null;
+  mockQueue.gapRemainingSec = null;
   (usePathname as jest.Mock).mockReturnValue('/');
 });
 
@@ -68,5 +77,13 @@ describe('MiniPlayer', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Open The Sleepy Moon' }));
 
     expect(router.push).toHaveBeenCalledWith({ pathname: '/story/[id]', params: { id: 'story-1' } });
+  });
+
+  it('shows the banner while a gap counts', async () => {
+    mockQueue.upNext = makeStory({ id: 'story-2', title: 'Brave Bear' });
+    mockQueue.gapRemainingSec = 3;
+    await render(<MiniPlayer />);
+
+    expect(screen.getByText('Up next: Brave Bear in 3')).toBeOnTheScreen();
   });
 });

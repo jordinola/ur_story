@@ -9,6 +9,9 @@ export const COVER_RATIO = { portrait: 0.78, landscape: 0.5 };
 export const COVER_INSET = 8;
 const TITLE_LINES = 2;
 const TITLE_LINE_HEIGHT = 21;
+// The button spans the meta line down to the card edge, so it never reaches into the title; hitSlop adds the rest of the 44pt target below.
+const MORE_SIZE = { width: 44, height: 30 };
+const MORE_HIT_SLOP = { bottom: 14 };
 
 type Props = {
   story: Story;
@@ -19,9 +22,18 @@ type Props = {
   landscape?: boolean;
   onPress: () => void;
   onToggleFavorite: () => void;
+  /** Long-press opens the story actions; the accessibility actions below reach the same choices without it. */
+  onLongPress?: () => void;
+  onPlayNext?: () => void;
+  onAddToQueue?: () => void;
 };
 
-export function StoryCard({ story, width, favorite, completed, landscape = false, onPress, onToggleFavorite }: Props) {
+const ACCESSIBILITY_ACTIONS = [
+  { name: 'playNext', label: 'Play next' },
+  { name: 'addToQueue', label: 'Add to queue' },
+];
+
+export function StoryCard({ story, width, favorite, completed, landscape = false, onPress, onToggleFavorite, onLongPress, onPlayNext, onAddToQueue }: Props) {
   const { fontScale } = useWindowDimensions();
   const coverHeight = width * (landscape ? COVER_RATIO.landscape : COVER_RATIO.portrait);
   // Always reserve two lines (scaled for Dynamic Type) so every card in the grid has the same height.
@@ -32,8 +44,14 @@ export function StoryCard({ story, width, favorite, completed, landscape = false
       {/* The shadow lives on the outer view because iOS drops shadows on views that clip their content. */}
       <Pressable
         onPress={onPress}
+        onLongPress={onLongPress}
         accessibilityRole="button"
         accessibilityLabel={`${story.title}, ${formatMinutes(story.durationSec)}`}
+        accessibilityActions={ACCESSIBILITY_ACTIONS}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'playNext') onPlayNext?.();
+          else if (event.nativeEvent.actionName === 'addToQueue') onAddToQueue?.();
+        }}
         style={({ pressed }) => [styles.card, cardShadow, pressed && { opacity: 0.85 }]}
       >
         <View style={styles.clip}>
@@ -58,7 +76,7 @@ export function StoryCard({ story, width, favorite, completed, landscape = false
             <Text style={[styles.title, { minHeight: titleMinHeight }]} numberOfLines={TITLE_LINES}>
               {story.title}
             </Text>
-            <Text style={styles.meta}>
+            <Text style={[styles.meta, onLongPress ? styles.metaClearOfMore : null]}>
               {formatMinutes(story.durationSec)} · Ages {story.ageRange}
             </Text>
           </View>
@@ -75,6 +93,19 @@ export function StoryCard({ story, width, favorite, completed, landscape = false
           {favorite ? '♥' : '♡'}
         </Text>
       </Pressable>
+      {onLongPress ? (
+        <Pressable
+          onPress={onLongPress}
+          hitSlop={MORE_HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel={`More actions for ${story.title}`}
+          style={styles.more}
+        >
+          <Text style={styles.moreText} allowFontScaling={false}>
+            ⋯
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -91,6 +122,8 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 6, paddingTop: 10, paddingBottom: 6, gap: 4 },
   title: { fontFamily: fonts.rounded, fontSize: 16, lineHeight: TITLE_LINE_HEIGHT, fontWeight: '700', color: colors.text },
   meta: { fontSize: 13, color: colors.muted },
+  // Keeps the meta text from running under the more button at large Dynamic Type.
+  metaClearOfMore: { paddingRight: MORE_SIZE.width - 6 },
   heart: {
     position: 'absolute',
     top: COVER_INSET + 8,
@@ -103,6 +136,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heartText: { fontSize: 20, lineHeight: 24 },
+  more: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: MORE_SIZE.width,
+    height: MORE_SIZE.height,
+    paddingBottom: COVER_INSET + 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreText: { fontSize: 20, lineHeight: 16, color: colors.muted },
   badge: {
     position: 'absolute',
     left: 8,
