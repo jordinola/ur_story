@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayer } from '../lib/PlayerProvider';
 import { cardShadow, colors, fonts, radius } from '../theme';
 import { MarqueeText } from './MarqueeText';
+import { UpNextBanner } from './UpNextBanner';
 
 /** Compact now-playing bar shown on every screen except the story screen. */
 export function MiniPlayer() {
@@ -52,6 +53,7 @@ export function MiniPlayer() {
               <Text style={styles.btnText}>{p.isPlaying ? '❚❚' : '▶'}</Text>
             </Pressable>
           </View>
+          <UpNextBanner />
         </View>
       </View>
     </View>
