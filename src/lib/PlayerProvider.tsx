@@ -25,7 +25,9 @@ type PlayerContextValue = {
   duration: number;
   error: string | null;
   /** False only when loading the story failed (`error` is set); a resume of the current story is true. */
-  play: (story: Story) => boolean;
+  play: (story: Story, options?: { fromStart?: boolean }) => boolean;
+  /** Restarts the current story from 0, also after it finished. Does nothing when no story is current. */
+  replay: () => void;
   toggle: () => void;
   /** Pauses unconditionally, unlike `toggle`, which flips whatever the native player is doing right now. */
   pause: () => void;
@@ -102,7 +104,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [player]);
 
   const play = useCallback(
-    (story: Story) => {
+    (story: Story, options?: { fromStart?: boolean }) => {
       if (currentRef.current?.id === story.id) {
         if (!player.playing) player.play();
         return true;
@@ -116,7 +118,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       try {
         player.setPlaybackRate(DEFAULT_RATE);
         const saved = getProgress(story.id);
-        pendingSeek.current = saved > 3 ? saved : null;
+        // fromStart is for an explicit pick (e.g. repeat-all wrapping), which must not resume mid-story.
+        pendingSeek.current = !options?.fromStart && saved > 3 ? saved : null;
         player.replace({ uri: resolveUrl(story.audio) });
         player.setActiveForLockScreen(true, {
           title: story.title,
@@ -253,6 +256,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     [player],
   );
 
+  // A finished player is not playing, so play() on the same id would only call player.play(), which
+  // can sit at the end. Seek first, then play. Nothing is marked completed here: that fires off the
+  // finish status change, and the periodic save skips a finished position.
+  const replay = useCallback(() => {
+    if (!currentRef.current) return;
+    pendingSeek.current = null; // a resume seek still waiting for the load must not override restarting from 0
+    seekTo(0);
+    player.play();
+  }, [player, seekTo]);
+
   const seekBy = useCallback(
     (delta: number) => {
       const total = status.duration || Infinity;
@@ -270,6 +283,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       duration: status.duration || current?.durationSec || 0,
       error,
       play,
+      replay,
       toggle,
       pause,
       seekBy,
@@ -283,7 +297,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       playbackRate,
       setPlaybackRate,
     }),
-    [current, status, error, play, toggle, pause, seekBy, seekTo, sleepMinutes, sleepRemainingSec, setSleepTimer, fadeOutAndPause, finishCount, sleepExpiredCount, playbackRate, setPlaybackRate],
+    [current, status, error, play, replay, toggle, pause, seekBy, seekTo, sleepMinutes, sleepRemainingSec, setSleepTimer, fadeOutAndPause, finishCount, sleepExpiredCount, playbackRate, setPlaybackRate],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

@@ -188,6 +188,29 @@ describe('PlayerProvider', () => {
       expect(mockPlayer.seekTo).not.toHaveBeenCalled();
     });
 
+    it('play without options still resumes from a saved position over 3 seconds', async () => {
+      mockLibrary.getProgress.mockReturnValue(40);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story, {}));
+
+      setStatus({ isLoaded: true });
+      await rerender({});
+
+      expect(mockPlayer.seekTo).toHaveBeenCalledWith(40);
+    });
+
+    it('play with fromStart ignores a saved position', async () => {
+      mockLibrary.getProgress.mockReturnValue(75);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story, { fromStart: true }));
+
+      setStatus({ isLoaded: true });
+      await rerender({});
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.seekTo).not.toHaveBeenCalled();
+    });
+
     it('exposes an error when the player fails to load', async () => {
       mockPlayer.replace.mockImplementationOnce(() => {
         throw new Error('boom');
@@ -209,6 +232,49 @@ describe('PlayerProvider', () => {
       await act(async () => result.current.play(makeStory({ id: 'story-2' })));
 
       expect(result.current.error).toBeNull();
+    });
+  });
+
+  describe('replay', () => {
+    it('replay seeks to 0 and plays the current story', async () => {
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+      mockPlayer.play.mockClear();
+      mockPlayer.replace.mockClear();
+      setStatus({ isLoaded: true, didJustFinish: true, currentTime: 120 });
+      await rerender({});
+
+      await act(async () => result.current.replay());
+
+      expect(mockPlayer.seekTo).toHaveBeenCalledWith(0);
+      expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.replace).not.toHaveBeenCalled();
+      expect(mockLibrary.markCompleted).toHaveBeenCalledTimes(1);
+    });
+
+    it('replay drops a pending resume seek and seeks to 0 before playing', async () => {
+      mockLibrary.getProgress.mockReturnValue(75);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+      mockPlayer.play.mockClear();
+
+      await act(async () => result.current.replay());
+      setStatus({ isLoaded: true });
+      await rerender({});
+
+      expect(mockPlayer.seekTo).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.seekTo).toHaveBeenCalledWith(0);
+      expect(mockPlayer.seekTo).not.toHaveBeenCalledWith(75);
+      expect(mockPlayer.seekTo.mock.invocationCallOrder[0]).toBeLessThan(mockPlayer.play.mock.invocationCallOrder[0]);
+    });
+
+    it('replay does nothing when no story is current', async () => {
+      const { result } = await setup();
+
+      await act(async () => result.current.replay());
+
+      expect(mockPlayer.seekTo).not.toHaveBeenCalled();
+      expect(mockPlayer.play).not.toHaveBeenCalled();
     });
   });
 

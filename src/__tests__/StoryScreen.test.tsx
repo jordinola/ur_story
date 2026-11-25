@@ -37,6 +37,12 @@ const mockQueue = {
   queue: [] as (typeof story)[],
   upNext: null as typeof story | null,
   gapRemainingSec: null as number | null,
+  canNext: false,
+  shuffle: false,
+  repeat: 'off' as 'off' | 'all' | 'one',
+  setShuffle: jest.fn(),
+  setRepeat: jest.fn(),
+  playPrevious: jest.fn(),
   cancelUpNext: jest.fn(),
   playNextNow: jest.fn(),
   playNow: jest.fn(),
@@ -70,6 +76,7 @@ beforeEach(() => {
   mockLibrary.isFavorite.mockReturnValue(false);
   mockQueue.upNext = null;
   mockQueue.gapRemainingSec = null;
+  mockQueue.canNext = false;
   (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'story-1' });
   setWidth(390);
 });
@@ -326,6 +333,33 @@ describe('StoryScreen', () => {
     expect(screen.getByRole('button', { name: 'The Sleepy Moon, show cover' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Add to favorites' })).toBeOnTheScreen();
     expect(screen.getByText('A moon who cannot sleep.')).toBeOnTheScreen();
+  });
+
+  it('the queue view shows the mode chips between the current-story row and Up next', async () => {
+    await render(<StoryScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Show queue' }));
+
+    const tree = JSON.stringify(screen.toJSON());
+    const at = (needle: string) => tree.indexOf(needle);
+    expect(at('show cover')).toBeGreaterThan(-1);
+    expect(at('Shuffle')).toBeGreaterThan(at('show cover'));
+    expect(at('Up next')).toBeGreaterThan(at('Repeat one'));
+  });
+
+  it('the cover view does not show the chips', async () => {
+    await render(<StoryScreen />);
+
+    expect(screen.queryByRole('button', { name: 'Shuffle' })).not.toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Repeat all' })).not.toBeOnTheScreen();
+  });
+
+  it('the wide layout also shows the chips in the queue view', async () => {
+    setWidth(1024);
+    await render(<StoryScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Show queue' }));
+
+    expect(scrollArea().getByRole('button', { name: 'Shuffle' })).toBeOnTheScreen();
+    expect(scrollArea().getByRole('button', { name: 'Repeat one' })).toBeOnTheScreen();
   });
 
   describe('missing story', () => {
