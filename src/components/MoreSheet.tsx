@@ -2,13 +2,59 @@ import { useEffect } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBedtime } from '../lib/BedtimeProvider';
+import { useDownloads } from '../lib/DownloadsProvider';
 import { formatTime } from '../lib/format';
 import { PLAYBACK_RATES } from '../lib/playbackRates';
 import { usePlayer } from '../lib/PlayerProvider';
 import { cardShadow, colors, fonts, radius } from '../theme';
+import type { Story } from '../types';
 
 const SLEEP_OPTIONS = [10, 20, 30];
 const SHEET_MAX_WIDTH = 560;
+
+// The playing story cannot be removed (its file is in use), so the row never offers Remove download.
+function DownloadRow({ story }: { story: Story }) {
+  const { downloaded, progress, errors, download, cancel } = useDownloads();
+  const fraction = progress[story.id];
+  const error = errors[story.id];
+
+  const control = (() => {
+    if (fraction != null) {
+      const percent = Math.round(fraction * 100);
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Cancel download, ${percent} percent`}
+          onPress={() => cancel(story.id)}
+          style={styles.chip}
+        >
+          <Text style={styles.chipText}>Cancel download · {percent}%</Text>
+        </Pressable>
+      );
+    }
+    if (downloaded[story.id]) return <Text style={styles.status}>Downloaded</Text>;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Download"
+        onPress={() => download(story)}
+        style={styles.chip}
+      >
+        <Text style={styles.chipText}>Download</Text>
+      </Pressable>
+    );
+  })();
+
+  return (
+    <View style={styles.rowGroup}>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Listen offline</Text>
+        {control}
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+    </View>
+  );
+}
 
 type MoreSheetProps = {
   visible: boolean;
@@ -70,6 +116,8 @@ export function MoreSheet({ visible, onClose }: MoreSheetProps) {
               </View>
             </View>
 
+            {p.current ? <DownloadRow story={p.current} /> : null}
+
             {bedtime.active ? (
               <View style={styles.row}>
                 <Text style={styles.rowLabel}>Bedtime ends in {formatTime(bedtime.remainingSec ?? 0)}</Text>
@@ -127,6 +175,9 @@ const styles = StyleSheet.create({
   closeText: { color: colors.text, fontSize: 18, fontWeight: '700' },
   rows: { gap: 16 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
+  rowGroup: { gap: 6 },
+  status: { color: colors.muted, fontFamily: fonts.rounded, fontSize: 15, fontWeight: '700', paddingVertical: 12 },
+  error: { color: colors.primary, fontSize: 13 },
   rowLabel: { color: colors.text, fontFamily: fonts.rounded, fontSize: 15, fontWeight: '700' },
   chips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   chip: {

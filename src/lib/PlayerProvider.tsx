@@ -13,6 +13,7 @@ import {
 import { resolveUrl } from './catalog';
 import { FADE_MS } from './fade';
 import { useLibrary } from './LibraryProvider';
+import { useDownloads } from './DownloadsProvider';
 import { DEFAULT_RATE } from './playbackRates';
 import { useProfiles } from './ProfilesProvider';
 import type { Story } from '../types';
@@ -52,6 +53,8 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 const PROGRESS_SAVE_INTERVAL_MS = 5000;
 const SLEEP_TICK_MS = 1000;
 const FADE_TICK_MS = 250;
+/** A downloaded file that has not loaded by then is replaced by the stream. */
+export const LOCAL_LOAD_TIMEOUT_MS = 10_000;
 
 // expo-audio exposes volume as a plain property; keep the assignment out of the component body.
 const setVolume = (player: { volume: number }, volume: number) => {
@@ -61,6 +64,7 @@ const setVolume = (player: { volume: number }, volume: number) => {
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { saveProgress, markCompleted, getProgress } = useLibrary();
   const { activeId } = useProfiles();
+  const { localUri } = useDownloads();
   const player = useAudioPlayer();
   const status = useAudioPlayerStatus(player);
 
@@ -77,6 +81,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const currentRef = useRef<Story | null>(null);
   const positionRef = useRef(0);
   const playingRef = useRef(false);
+  // Read through a ref so a download finishing does not change play's identity for its consumers.
+  const localUriRef = useRef(localUri);
+  // The story whose downloaded file is loading and may still fall back to streaming. Cleared once it
+  // loads, once it has fallen back (so a failing stream never loops), on a new story and on a switch.
+  const localFallback = useRef<Story | null>(null);
+  const localLoadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Whether the app last asked to play rather than pause. While a source loads, player.playing is
+  // still false, so it cannot tell a requested play from a pause.
+  const playRequested = useRef(false);
 
   // Keep refs in sync after commit (not during render). Declared first, and a layout effect, so the
   // effects below (including the profile-switch layout effect) always read fresh values.
@@ -84,6 +97,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     currentRef.current = current;
     positionRef.current = status.currentTime;
     playingRef.current = status.playing;
+    localUriRef.current = localUri;
   });
 
   useEffect(() => {
@@ -103,13 +117,42 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [player]);
 
+  const disarmLocalFallback = useCallback(() => {
+    localFallback.current = null;
+    if (localLoadTimer.current != null) clearTimeout(localLoadTimer.current);
+    localLoadTimer.current = null;
+  }, []);
+
+  // pendingSeek is left as play() set it (the local file never loaded, so it is still waiting), which
+  // keeps the saved-position resume, fromStart and a replay() made while loading.
+  const fallBackToStream = useCallback(() => {
+    const story = localFallback.current;
+    disarmLocalFallback();
+    if (!story || currentRef.current?.id !== story.id) return;
+    try {
+      player.replace({ uri: resolveUrl(story.audio) });
+      if (playRequested.current) player.play();
+    } catch {
+      setError('Could not load this story. Check your connection and the audio URL.');
+    }
+  }, [player, disarmLocalFallback]);
+
+  // The status can miss a load (isLoaded true for the previous story, then true again), so the live
+  // player has the final say before a working local file is swapped for the stream.
+  const onLocalLoadTimeout = useCallback(() => {
+    if (player.isLoaded) disarmLocalFallback();
+    else fallBackToStream();
+  }, [player, disarmLocalFallback, fallBackToStream]);
+
   const play = useCallback(
     (story: Story, options?: { fromStart?: boolean }) => {
+      playRequested.current = true;
       if (currentRef.current?.id === story.id) {
         if (!player.playing) player.play();
         return true;
       }
       setError(null);
+      disarmLocalFallback();
       // Sync ref so a same-story play() before the commit (e.g. a setParams render) is a resume.
       currentRef.current = story;
       setCurrent(story);
@@ -120,7 +163,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const saved = getProgress(story.id);
         // fromStart is for an explicit pick (e.g. repeat-all wrapping), which must not resume mid-story.
         pendingSeek.current = !options?.fromStart && saved > 3 ? saved : null;
-        player.replace({ uri: resolveUrl(story.audio) });
+        const local = localUriRef.current(story.id);
+        player.replace({ uri: local ?? resolveUrl(story.audio) });
+        if (local) {
+          localFallback.current = story;
+          localLoadTimer.current = setTimeout(onLocalLoadTimeout, LOCAL_LOAD_TIMEOUT_MS);
+        }
         player.setActiveForLockScreen(true, {
           title: story.title,
           artist: 'UR Story',
@@ -133,7 +181,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [player, getProgress, restoreVolume],
+    [player, getProgress, restoreVolume, disarmLocalFallback, onLocalLoadTimeout],
   );
 
   // Resume from the saved position once the new source has loaded.
@@ -145,6 +193,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [status.isLoaded, player]);
 
+  // A downloaded file that loaded no longer needs the streaming fallback.
+  useEffect(() => {
+    if (status.isLoaded) disarmLocalFallback();
+  }, [status.isLoaded, disarmLocalFallback]);
+
+  // The player reports a failed load (e.g. a missing or corrupt file) on the status.
+  useEffect(() => {
+    // An external player event; the fallback only sets an error when the stream cannot be loaded.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (status.error) fallBackToStream();
+  }, [status.error, fallBackToStream]);
+
+  useEffect(() => disarmLocalFallback, [disarmLocalFallback]);
+
   // Library writes go to the active profile, so a story started by one kid must never save into
   // another's. On a switch, stop and forget the story before any later tick, pause or finish fires,
   // and drop the lock-screen session so it cannot restart the previous kid's story out of the app.
@@ -155,13 +217,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     playingFor.current = activeId;
     currentRef.current = null;
     pendingSeek.current = null;
+    disarmLocalFallback();
+    playRequested.current = false;
     setCurrent(null);
     setSleepMinutes(null);
     setSleepEndsAt(null);
     setSleepRemainingSec(null);
     player.pause();
     player.clearLockScreenControls();
-  }, [activeId, player]);
+  }, [activeId, player, disarmLocalFallback]);
 
   // Save progress periodically while playing, and when pausing.
   useEffect(() => {
@@ -209,6 +273,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const tick = () => {
       const remainingMs = sleepEndsAt - Date.now();
       if (remainingMs <= 0) {
+        playRequested.current = false;
         player.pause();
         setSleepMinutes(null);
         setSleepEndsAt(null);
@@ -241,11 +306,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   );
 
   const toggle = useCallback(() => {
+    playRequested.current = !player.playing;
     if (player.playing) player.pause();
     else player.play();
   }, [player]);
 
   const pause = useCallback(() => {
+    playRequested.current = false;
     player.pause();
   }, [player]);
 
@@ -263,6 +330,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!currentRef.current) return;
     pendingSeek.current = null; // a resume seek still waiting for the load must not override restarting from 0
     seekTo(0);
+    playRequested.current = true;
     player.play();
   }, [player, seekTo]);
 

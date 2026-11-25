@@ -1,17 +1,20 @@
 import { router, type Href } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddProfileCard } from '../components/AddProfileCard';
 import { BedtimeEntry } from '../components/BedtimeEntry';
 import { SkeletonCard } from '../components/SkeletonCard';
-import { StoryCard } from '../components/StoryCard';
+import { StoryCard, type DownloadState } from '../components/StoryCard';
 import { StoryRow } from '../components/StoryRow';
+import { useDownloads } from '../lib/DownloadsProvider';
+import { formatBytes } from '../lib/downloads';
 import { useLibrary } from '../lib/LibraryProvider';
+import { usePlayer } from '../lib/PlayerProvider';
 import { useProfiles } from '../lib/ProfilesProvider';
 import { useQueue } from '../lib/QueueProvider';
 import { buildHomeSections } from '../lib/recommend';
-import { showStoryActions } from '../lib/storyActions';
+import { showStoryActions, type DownloadAction } from '../lib/storyActions';
 import { colors, fonts, MAX_CONTENT_WIDTH, radius } from '../theme';
 import type { Story } from '../types';
 
@@ -21,7 +24,24 @@ const MIN_CARD_WIDTH = 170;
 const ROW_VISIBLE_CARDS = 2.3;
 const ADD_PROFILE_ROUTE = '/profiles/edit' as Href;
 
-type Filter = 'all' | 'favorites';
+type Filter = 'all' | 'favorites' | 'downloaded';
+
+/**
+ * Keeps the playing story's id in a ref without re-rendering the grid: the player context changes
+ * on every position tick, so only this null-rendering child subscribes to it.
+ */
+function CurrentStoryBridge({ currentIdRef }: { currentIdRef: RefObject<string | null> }) {
+  const currentId = usePlayer().current?.id ?? null;
+  useEffect(() => {
+    currentIdRef.current = currentId;
+  }, [currentId, currentIdRef]);
+  return null;
+}
+const EMPTY_TEXT: Record<Filter, string> = {
+  all: 'No stories yet.',
+  favorites: 'Tap the heart on a story to save it here.',
+  downloaded: 'No downloads yet. Press and hold a story, or tap the more button on a card, and choose Download.',
+};
 type Placeholder = { id: string; placeholder: true };
 
 export default function LibraryScreen() {
@@ -31,6 +51,9 @@ export default function LibraryScreen() {
   const { stories, loading, favorites, progress, completed, isFavorite, isCompleted, toggleFavorite } = useLibrary();
   const { enqueue, playNext } = useQueue();
   const { ready: profilesReady, activeProfile } = useProfiles();
+  const downloads = useDownloads();
+  // Read only when the action sheet opens; see CurrentStoryBridge.
+  const currentIdRef = useRef<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
 
   // Adaptive grid: 2 columns on iPhone portrait, up to 5 on a landscape iPad.
@@ -46,10 +69,20 @@ export default function LibraryScreen() {
     [stories, activeProfile, progress, completed],
   );
 
-  const data = useMemo(
-    () => (filter === 'favorites' ? stories.filter((s) => favorites.includes(s.id)) : stories),
-    [filter, stories, favorites],
+  // Only catalog stories count: files whose story left the catalog are never listed or summed.
+  const downloadedStories = useMemo(
+    () => stories.filter((s) => downloads.downloaded[s.id]),
+    [stories, downloads.downloaded],
   );
+  const downloadedBytes = useMemo(
+    () => downloadedStories.reduce((sum, s) => sum + (downloads.downloaded[s.id]?.sizeBytes ?? 0), 0),
+    [downloadedStories, downloads.downloaded],
+  );
+
+  const data = useMemo(() => {
+    if (filter === 'favorites') return stories.filter((s) => favorites.includes(s.id));
+    return filter === 'downloaded' ? downloadedStories : stories;
+  }, [filter, stories, favorites, downloadedStories]);
 
   // Two rows of placeholders keep the layout steady while stories load.
   const placeholders = useMemo<Placeholder[]>(
@@ -58,6 +91,31 @@ export default function LibraryScreen() {
   );
 
   const rows: (Story | Placeholder)[] = loading ? placeholders : data;
+
+  const downloadStateOf = (story: Story): DownloadState | undefined => {
+    const fraction = downloads.progress[story.id];
+    if (fraction != null) return { downloading: fraction };
+    if (downloads.downloaded[story.id]) return 'downloaded';
+    return downloads.errors[story.id] ? 'failed' : undefined;
+  };
+
+  // The playing story's file cannot be removed, so a downloaded current story gets no entry.
+  // A failed download is offered as Download again.
+  const downloadActionOf = (story: Story): DownloadAction | undefined => {
+    if (downloads.progress[story.id] != null) {
+      return { label: 'Cancel download', onPress: () => downloads.cancel(story.id) };
+    }
+    if (!downloads.downloaded[story.id]) return { label: 'Download', onPress: () => downloads.download(story) };
+    if (currentIdRef.current === story.id) return undefined;
+    return { label: 'Remove download', onPress: () => downloads.requestRemove(story) };
+  };
+
+  const showActions = (story: Story) =>
+    showStoryActions(story, {
+      onPlayNext: () => playNext(story),
+      onAddToQueue: () => enqueue(story),
+      download: downloadActionOf(story),
+    });
 
   const renderCard = (story: Story, width: number) => (
     <StoryCard
@@ -68,9 +126,10 @@ export default function LibraryScreen() {
       landscape={landscape}
       onPress={() => router.push({ pathname: '/story/[id]', params: { id: story.id } })}
       onToggleFavorite={() => toggleFavorite(story.id)}
-      onLongPress={() => showStoryActions(story, { onPlayNext: () => playNext(story), onAddToQueue: () => enqueue(story) })}
+      onLongPress={() => showActions(story)}
       onPlayNext={() => playNext(story)}
       onAddToQueue={() => enqueue(story)}
+      downloadState={downloadStateOf(story)}
     />
   );
 
@@ -111,13 +170,25 @@ export default function LibraryScreen() {
           </Text>
         </View>
       ) : null}
+      {filter === 'downloaded' && !loading && downloadedStories.length > 0 ? (
+        <Text style={styles.summary}>
+          {`${downloadedStories.length} ${downloadedStories.length === 1 ? 'story' : 'stories'} · ${formatBytes(downloadedBytes, { trimZero: true })}`}
+        </Text>
+      ) : null}
     </View>
   );
 
+  const chipLabel = (f: Filter) => {
+    if (f === 'all') return 'All stories';
+    if (f === 'favorites') return `♥ Favorites${favorites.length ? ` (${favorites.length})` : ''}`;
+    return `Downloaded${downloadedStories.length ? ` (${downloadedStories.length})` : ''}`;
+  };
+
   return (
     <View style={styles.screen}>
+      <CurrentStoryBridge currentIdRef={currentIdRef} />
       <View style={[styles.filters, { paddingHorizontal: sidePad }]}>
-        {(['all', 'favorites'] as const).map((f) => (
+        {(['all', 'favorites', 'downloaded'] as const).map((f) => (
           <Pressable
             key={f}
             accessibilityRole="button"
@@ -126,7 +197,7 @@ export default function LibraryScreen() {
             style={[styles.chip, filter === f && styles.chipActive]}
           >
             <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>
-              {f === 'all' ? 'All stories' : `♥ Favorites${favorites.length ? ` (${favorites.length})` : ''}`}
+              {chipLabel(f)}
             </Text>
           </Pressable>
         ))}
@@ -159,7 +230,7 @@ export default function LibraryScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            {filter === 'favorites' ? 'Tap the heart on a story to save it here.' : 'No stories yet.'}
+            {EMPTY_TEXT[filter]}
           </Text>
         }
       />
@@ -169,10 +240,12 @@ export default function LibraryScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  filters: { flexDirection: 'row', gap: 8, paddingVertical: 12 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 12 },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 9,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
@@ -188,5 +261,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 10,
   },
+  summary: { color: colors.muted, fontFamily: fonts.rounded, fontSize: 14, marginBottom: 12 },
   empty: { textAlign: 'center', color: colors.muted, marginTop: 48, fontSize: 16 },
 });

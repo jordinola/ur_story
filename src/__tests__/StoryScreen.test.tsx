@@ -51,6 +51,9 @@ const mockQueue = {
 };
 jest.mock('../lib/QueueProvider', () => ({ useQueue: () => mockQueue }));
 jest.mock('../lib/PlayerProvider', () => ({ usePlayer: () => mockPlayer }));
+jest.mock('../lib/DownloadsProvider', () => ({
+  useDownloads: () => ({ downloaded: {}, progress: {}, errors: {}, download: jest.fn(), cancel: jest.fn() }),
+}));
 jest.mock('../lib/BedtimeProvider', () => ({
   useBedtime: () => ({ active: false, locked: false, remainingSec: null }),
 }));

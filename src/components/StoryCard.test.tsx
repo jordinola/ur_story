@@ -82,6 +82,79 @@ describe('StoryCard', () => {
     expect(screen.getByText('✓ Listened')).toBeOnTheScreen();
   });
 
+  it('StoryCard shows the Downloaded badge', async () => {
+    const { rerender } = await renderCard();
+    expect(screen.queryByText('Downloaded')).not.toBeOnTheScreen();
+
+    await rerender(
+      <StoryCard
+        story={makeStory()}
+        width={200}
+        favorite={false}
+        completed
+        downloadState="downloaded"
+        onPress={jest.fn()}
+        onToggleFavorite={jest.fn()}
+      />,
+    );
+    // Both badges show, stacked in one column so they never overlap.
+    const downloaded = screen.getByText('Downloaded');
+    const listened = screen.getByText('✓ Listened');
+    expect(downloaded.parent?.parent).toBe(listened.parent?.parent);
+    expect(StyleSheet.flatten(downloaded.parent?.parent?.props.style).position).toBe('absolute');
+    expect(StyleSheet.flatten(downloaded.parent?.props.style).position).toBeUndefined();
+  });
+
+  it('StoryCard shows the download percentage', async () => {
+    const { rerender } = await renderCard({ downloadState: { downloading: 0.404 } });
+    expect(screen.getByText('Downloading 40%')).toBeOnTheScreen();
+
+    await rerender(
+      <StoryCard
+        story={makeStory()}
+        width={200}
+        favorite={false}
+        completed={false}
+        downloadState={{ downloading: 0 }}
+        onPress={jest.fn()}
+        onToggleFavorite={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Downloading 0%')).toBeOnTheScreen();
+  });
+
+  it('StoryCard label mentions the state', async () => {
+    const { rerender } = await renderCard({ downloadState: 'downloaded' });
+    expect(screen.getByRole('button', { name: 'The Sleepy Moon, 5 min, downloaded' })).toBeOnTheScreen();
+
+    await rerender(
+      <StoryCard
+        story={makeStory()}
+        width={200}
+        favorite={false}
+        completed={false}
+        downloadState={{ downloading: 0.4 }}
+        onPress={jest.fn()}
+        onToggleFavorite={jest.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'The Sleepy Moon, 5 min, downloading 40 percent' })).toBeOnTheScreen();
+  });
+
+  it('StoryCard shows a Download failed badge stacked with Listened', async () => {
+    await renderCard({ downloadState: 'failed', completed: true });
+
+    const failed = screen.getByText('Download failed');
+    const listened = screen.getByText('✓ Listened');
+    expect(failed.parent?.parent).toBe(listened.parent?.parent);
+  });
+
+  it('StoryCard label mentions a failed download', async () => {
+    await renderCard({ downloadState: 'failed' });
+
+    expect(screen.getByRole('button', { name: 'The Sleepy Moon, 5 min, download failed' })).toBeOnTheScreen();
+  });
+
   it('calls onPress when the card is tapped', async () => {
     const { onPress } = await renderCard();
 

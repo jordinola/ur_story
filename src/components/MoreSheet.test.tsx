@@ -1,7 +1,13 @@
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { makeStory } from '../test/fixtures';
+import type { Story } from '../types';
 import { MoreSheet } from './MoreSheet';
 
+const story = makeStory({ id: 'story-1' });
+
 const mockPlayer = {
+  current: null as Story | null,
   playbackRate: 1,
   setPlaybackRate: jest.fn(),
   sleepMinutes: null as number | null,
@@ -15,12 +21,26 @@ const mockBedtime = {
   remainingSec: null as number | null,
 };
 
+const mockDownloads = {
+  downloaded: {} as Record<string, { sizeBytes: number }>,
+  progress: {} as Record<string, number>,
+  errors: {} as Record<string, string>,
+  download: jest.fn(),
+  cancel: jest.fn(),
+  requestRemove: jest.fn(),
+};
+
+jest.mock('../lib/DownloadsProvider', () => ({ useDownloads: () => mockDownloads }));
 jest.mock('../lib/PlayerProvider', () => ({ usePlayer: () => mockPlayer }));
 jest.mock('../lib/BedtimeProvider', () => ({ useBedtime: () => mockBedtime }));
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPlayer.current = null;
   mockPlayer.playbackRate = 1;
+  mockDownloads.downloaded = {};
+  mockDownloads.progress = {};
+  mockDownloads.errors = {};
   mockPlayer.sleepMinutes = null;
   mockPlayer.sleepRemainingSec = null;
   mockBedtime.active = false;
@@ -129,5 +149,55 @@ describe('MoreSheet', () => {
 
     expect(screen.queryByText('Speed')).not.toBeOnTheScreen();
     expect(screen.queryByRole('button')).not.toBeOnTheScreen();
+  });
+
+  describe('download row', () => {
+    it('MoreSheet shows Download for the current story and starts it', async () => {
+      mockPlayer.current = story;
+      await render(<MoreSheet visible onClose={jest.fn()} />);
+
+      const button = screen.getByRole('button', { name: 'Download' });
+      expect(StyleSheet.flatten(button.props.style).minHeight).toBeGreaterThanOrEqual(44);
+      await fireEvent.press(button);
+
+      expect(mockDownloads.download).toHaveBeenCalledWith(story);
+    });
+
+    it('MoreSheet shows Cancel download with the percentage while downloading', async () => {
+      mockPlayer.current = story;
+      mockDownloads.progress = { 'story-1': 0.4 };
+      await render(<MoreSheet visible onClose={jest.fn()} />);
+
+      expect(screen.getByText('Cancel download · 40%')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Download' })).not.toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Cancel download, 40 percent' }));
+
+      expect(mockDownloads.cancel).toHaveBeenCalledWith('story-1');
+    });
+
+    it('MoreSheet shows Downloaded status for a downloaded story', async () => {
+      mockPlayer.current = story;
+      mockDownloads.downloaded = { 'story-1': { sizeBytes: 1000 } };
+      await render(<MoreSheet visible onClose={jest.fn()} />);
+
+      expect(screen.getByText('Downloaded')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: /download/i })).not.toBeOnTheScreen();
+      expect(mockDownloads.requestRemove).not.toHaveBeenCalled();
+    });
+
+    it('MoreSheet shows the download error under the row', async () => {
+      mockPlayer.current = story;
+      mockDownloads.errors = { 'story-1': 'Could not download this story. Check your connection.' };
+      await render(<MoreSheet visible onClose={jest.fn()} />);
+
+      expect(screen.getByText('Could not download this story. Check your connection.')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Download' })).toBeOnTheScreen();
+    });
+
+    it('MoreSheet hides the row when nothing is playing', async () => {
+      await render(<MoreSheet visible onClose={jest.fn()} />);
+
+      expect(screen.queryByText(/download/i)).not.toBeOnTheScreen();
+    });
   });
 });

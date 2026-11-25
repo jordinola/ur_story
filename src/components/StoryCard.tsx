@@ -13,6 +13,23 @@ const TITLE_LINE_HEIGHT = 21;
 const MORE_SIZE = { width: 44, height: 30 };
 const MORE_HIT_SLOP = { bottom: 14 };
 
+/** A fraction from 0 to 1 while queued or running (a queued download is still at 0); failed after an error. */
+export type DownloadState = 'downloaded' | 'failed' | { downloading: number };
+
+const percentOf = (fraction: number) => Math.round(fraction * 100);
+
+const downloadBadgeText = (state: DownloadState) => {
+  if (state === 'downloaded') return 'Downloaded';
+  if (state === 'failed') return 'Download failed';
+  return `Downloading ${percentOf(state.downloading)}%`;
+};
+
+const downloadLabelText = (state: DownloadState) => {
+  if (state === 'downloaded') return ', downloaded';
+  if (state === 'failed') return ', download failed';
+  return `, downloading ${percentOf(state.downloading)} percent`;
+};
+
 type Props = {
   story: Story;
   width: number;
@@ -26,6 +43,7 @@ type Props = {
   onLongPress?: () => void;
   onPlayNext?: () => void;
   onAddToQueue?: () => void;
+  downloadState?: DownloadState;
 };
 
 const ACCESSIBILITY_ACTIONS = [
@@ -33,11 +51,13 @@ const ACCESSIBILITY_ACTIONS = [
   { name: 'addToQueue', label: 'Add to queue' },
 ];
 
-export function StoryCard({ story, width, favorite, completed, landscape = false, onPress, onToggleFavorite, onLongPress, onPlayNext, onAddToQueue }: Props) {
+export function StoryCard({ story, width, favorite, completed, landscape = false, onPress, onToggleFavorite, onLongPress, onPlayNext, onAddToQueue, downloadState }: Props) {
   const { fontScale } = useWindowDimensions();
   const coverHeight = width * (landscape ? COVER_RATIO.landscape : COVER_RATIO.portrait);
   // Always reserve two lines (scaled for Dynamic Type) so every card in the grid has the same height.
   const titleMinHeight = TITLE_LINES * TITLE_LINE_HEIGHT * fontScale;
+  const downloadBadge = downloadState ? downloadBadgeText(downloadState) : null;
+  const downloadLabel = downloadState ? downloadLabelText(downloadState) : '';
 
   return (
     <View style={{ width }}>
@@ -46,7 +66,7 @@ export function StoryCard({ story, width, favorite, completed, landscape = false
         onPress={onPress}
         onLongPress={onLongPress}
         accessibilityRole="button"
-        accessibilityLabel={`${story.title}, ${formatMinutes(story.durationSec)}`}
+        accessibilityLabel={`${story.title}, ${formatMinutes(story.durationSec)}${downloadLabel}`}
         accessibilityActions={ACCESSIBILITY_ACTIONS}
         onAccessibilityAction={(event) => {
           if (event.nativeEvent.actionName === 'playNext') onPlayNext?.();
@@ -66,9 +86,19 @@ export function StoryCard({ story, width, favorite, completed, landscape = false
                 <Text style={[styles.emoji, { fontSize: Math.min(width * 0.38, coverHeight * 0.62) }]}>{story.emoji}</Text>
               </>
             )}
-            {completed ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>✓ Listened</Text>
+            {completed || downloadBadge ? (
+              // One column for all badges, so "Downloaded" and "✓ Listened" stack instead of overlapping.
+              <View style={styles.badges}>
+                {downloadBadge ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{downloadBadge}</Text>
+                  </View>
+                ) : null}
+                {completed ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>✓ Listened</Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -147,10 +177,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   moreText: { fontSize: 20, lineHeight: 16, color: colors.muted },
+  badges: { position: 'absolute', left: 8, bottom: 8, alignItems: 'flex-start', gap: 4 },
   badge: {
-    position: 'absolute',
-    left: 8,
-    bottom: 8,
     backgroundColor: 'rgba(0,0,0,0.55)',
     paddingHorizontal: 8,
     paddingVertical: 3,

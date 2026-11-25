@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import * as RN from 'react-native';
 import LibraryScreen from '../app/index';
@@ -37,6 +37,46 @@ jest.mock('../lib/LibraryProvider', () => ({ useLibrary: () => mockLibrary }));
 jest.mock('../lib/ProfilesProvider', () => ({ useProfiles: () => mockProfiles }));
 const mockQueue = { enqueue: jest.fn(), playNext: jest.fn() };
 jest.mock('../lib/QueueProvider', () => ({ useQueue: () => mockQueue }));
+const mockDownloads = {
+  downloaded: {} as Record<string, { sizeBytes: number }>,
+  progress: {} as Record<string, number>,
+  errors: {} as Record<string, string>,
+  download: jest.fn(),
+  cancel: jest.fn(),
+  requestRemove: jest.fn(),
+};
+jest.mock('../lib/DownloadsProvider', () => ({ useDownloads: () => mockDownloads }));
+// A tiny external store, so a change to the player (for example its position) re-renders only the
+// components that actually call usePlayer, as the real context does.
+const mockPlayerStore = {
+  state: { current: null as Story | null, position: 0 },
+  listeners: new Set<() => void>(),
+  set(patch: Partial<{ current: Story | null; position: number }>) {
+    mockPlayerStore.state = { ...mockPlayerStore.state, ...patch };
+    mockPlayerStore.listeners.forEach((listener) => listener());
+  },
+  subscribe(listener: () => void) {
+    mockPlayerStore.listeners.add(listener);
+    return () => mockPlayerStore.listeners.delete(listener);
+  },
+};
+jest.mock('../lib/PlayerProvider', () => {
+  const { useSyncExternalStore } = jest.requireActual('react');
+  return {
+    usePlayer: () => useSyncExternalStore(mockPlayerStore.subscribe, () => mockPlayerStore.state),
+  };
+});
+const mockCardRenders = jest.fn();
+jest.mock('../components/StoryCard', () => {
+  const actual = jest.requireActual('../components/StoryCard');
+  return {
+    ...actual,
+    StoryCard: (props: { story: Story }) => {
+      mockCardRenders(props.story.id);
+      return actual.StoryCard(props);
+    },
+  };
+});
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('../lib/BedtimeProvider', () => ({
   useBedtime: () => ({ active: false, remainingSec: null, startBedtime: jest.fn(), endBedtime: jest.fn() }),
@@ -53,6 +93,10 @@ beforeEach(() => {
   mockLibrary.favorites = [];
   mockLibrary.progress = {};
   mockLibrary.completed = [];
+  mockDownloads.downloaded = {};
+  mockDownloads.progress = {};
+  mockDownloads.errors = {};
+  mockPlayerStore.state = { current: null, position: 0 };
   mockProfiles.ready = true;
   mockProfiles.activeProfile = null;
   setWidth(390);
@@ -77,6 +121,91 @@ describe('LibraryScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'More actions for Story B' }));
 
     expect(mockQueue.enqueue).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }));
+  });
+
+  it('LibraryScreen long-press then Download starts the download', async () => {
+    const spy = jest
+      .spyOn(RN.ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation((_options, callback) => callback(2));
+    await render(<LibraryScreen />);
+
+    await fireEvent(screen.getByRole('button', { name: /^Story B,/ }), 'longPress');
+
+    expect(spy.mock.lastCall?.[0].options).toEqual(['Play next', 'Add to queue', 'Download', 'Cancel']);
+    expect(mockDownloads.download).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }));
+  });
+
+  it('LibraryScreen offers Cancel download while a story is downloading', async () => {
+    mockDownloads.progress = { b: 0 };
+    jest.spyOn(RN.ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_options, callback) => callback(2));
+    await render(<LibraryScreen />);
+
+    expect(screen.getByText('Downloading 0%')).toBeOnTheScreen();
+    await fireEvent(screen.getByRole('button', { name: /^Story B,/ }), 'longPress');
+
+    expect(mockDownloads.cancel).toHaveBeenCalledWith('b');
+    expect(mockDownloads.download).not.toHaveBeenCalled();
+  });
+
+  it('LibraryScreen Remove download opens the removal request', async () => {
+    mockDownloads.downloaded = { b: { sizeBytes: 1000 } };
+    jest.spyOn(RN.ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_options, callback) => callback(2));
+    await render(<LibraryScreen />);
+
+    expect(screen.getByRole('button', { name: /^Story B, .*, downloaded$/ })).toBeOnTheScreen();
+    await fireEvent(screen.getByRole('button', { name: /^Story B,/ }), 'longPress');
+
+    expect(mockDownloads.requestRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }));
+  });
+
+  it('LibraryScreen offers no download entry for the playing downloaded story', async () => {
+    mockDownloads.downloaded = { b: { sizeBytes: 1000 } };
+    mockPlayerStore.state = { current: stories[1] ?? null, position: 0 };
+    const spy = jest.spyOn(RN.ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => {});
+    await render(<LibraryScreen />);
+
+    await fireEvent(screen.getByRole('button', { name: /^Story B,/ }), 'longPress');
+
+    expect(spy.mock.lastCall?.[0].options).toEqual(['Play next', 'Add to queue', 'Cancel']);
+  });
+
+  it('LibraryScreen does not re-render its cards when only the player position changes', async () => {
+    mockPlayerStore.state = { current: stories[0] ?? null, position: 0 };
+    await render(<LibraryScreen />);
+    const rendersBefore = mockCardRenders.mock.calls.length;
+
+    await act(async () => {
+      mockPlayerStore.set({ position: 5 });
+      mockPlayerStore.set({ position: 6 });
+    });
+
+    expect(mockCardRenders.mock.calls.length).toBe(rendersBefore);
+  });
+
+  it('LibraryScreen does not offer Remove download once the story starts playing', async () => {
+    mockDownloads.downloaded = { b: { sizeBytes: 1000 } };
+    const spy = jest.spyOn(RN.ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => {});
+    await render(<LibraryScreen />);
+
+    await act(async () => mockPlayerStore.set({ current: stories[1] ?? null }));
+    await fireEvent(screen.getByRole('button', { name: /^Story B,/ }), 'longPress');
+
+    expect(spy.mock.lastCall?.[0].options).toEqual(['Play next', 'Add to queue', 'Cancel']);
+  });
+
+  it('LibraryScreen shows a failed download on the card and offers Download again', async () => {
+    mockDownloads.errors = { b: 'Could not download this story. Check your connection.' };
+    const spy = jest
+      .spyOn(RN.ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation((_options, callback) => callback(2));
+    await render(<LibraryScreen />);
+
+    expect(screen.getByText('Download failed')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: /^Story B, .*, download failed$/ })).toBeOnTheScreen();
+    await fireEvent(screen.getByRole('button', { name: /^Story B,/ }), 'longPress');
+
+    expect(spy.mock.lastCall?.[0].options).toEqual(['Play next', 'Add to queue', 'Download', 'Cancel']);
+    expect(mockDownloads.download).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }));
   });
 
   it('shows the Bedtime chip', async () => {
@@ -147,6 +276,104 @@ describe('LibraryScreen', () => {
       await fireEvent.press(screen.getByText('All stories'));
 
       expect(screen.getByText('Story A')).toBeOnTheScreen();
+    });
+  });
+
+  describe('Downloaded filter', () => {
+    const MB = 1024 * 1024;
+
+    it('the Downloaded chip lists only downloaded stories that are in the catalog', async () => {
+      mockDownloads.downloaded = { b: { sizeBytes: MB }, ghost: { sizeBytes: MB } };
+      await render(<LibraryScreen />);
+
+      await fireEvent.press(screen.getByText('Downloaded (1)'));
+
+      expect(screen.getByText('Story B')).toBeOnTheScreen();
+      expect(screen.queryByText('Story A')).not.toBeOnTheScreen();
+      expect(screen.queryByText('Story C')).not.toBeOnTheScreen();
+    });
+
+    it('the chip shows the count', async () => {
+      mockDownloads.downloaded = { a: { sizeBytes: MB }, c: { sizeBytes: MB } };
+      await render(<LibraryScreen />);
+
+      expect(screen.getByRole('button', { name: 'Downloaded (2)', selected: false })).toBeOnTheScreen();
+    });
+
+    it('filter chips meet the 44 pt minimum touch target', async () => {
+      await render(<LibraryScreen />);
+
+      for (const name of ['All stories', 'Favorites', 'Downloaded']) {
+        expect(screen.getByRole('button', { name: new RegExp(name) })).toHaveStyle({ minHeight: 44 });
+      }
+    });
+
+    it('omits the count when nothing is downloaded', async () => {
+      await render(<LibraryScreen />);
+
+      expect(screen.getByRole('button', { name: 'Downloaded' })).toBeOnTheScreen();
+    });
+
+    it('the summary line shows count and size', async () => {
+      mockDownloads.downloaded = { a: { sizeBytes: 10 * MB }, b: { sizeBytes: 20 * MB }, c: { sizeBytes: 12 * MB } };
+      await render(<LibraryScreen />);
+
+      await fireEvent.press(screen.getByText('Downloaded (3)'));
+
+      expect(screen.getByText('3 stories · 42 MB')).toBeOnTheScreen();
+    });
+
+    it('orphaned files are not counted', async () => {
+      mockDownloads.downloaded = { a: { sizeBytes: 5 * MB }, ghost: { sizeBytes: 500 * MB } };
+      await render(<LibraryScreen />);
+
+      await fireEvent.press(screen.getByText('Downloaded (1)'));
+
+      expect(screen.getByText('1 story · 5 MB')).toBeOnTheScreen();
+    });
+
+    it('singular wording for one story', async () => {
+      mockDownloads.downloaded = { a: { sizeBytes: 842 * 1024 } };
+      await render(<LibraryScreen />);
+
+      await fireEvent.press(screen.getByText('Downloaded (1)'));
+
+      expect(screen.getByText('1 story · 842 KB')).toBeOnTheScreen();
+    });
+
+    it('the empty state explains how to download', async () => {
+      mockDownloads.downloaded = { ghost: { sizeBytes: MB } };
+      await render(<LibraryScreen />);
+
+      await fireEvent.press(screen.getByText('Downloaded'));
+
+      expect(
+        screen.getByText('No downloads yet. Press and hold a story, or tap the more button on a card, and choose Download.'),
+      ).toBeOnTheScreen();
+      expect(screen.queryByText(/^\d+ stor(y|ies) · /)).not.toBeOnTheScreen();
+    });
+
+    it('the filter is exclusive with Favorites', async () => {
+      mockLibrary.favorites = ['a'];
+      mockDownloads.downloaded = { b: { sizeBytes: MB } };
+      await render(<LibraryScreen />);
+
+      await fireEvent.press(screen.getByText('Downloaded (1)'));
+      expect(screen.getByRole('button', { name: 'Downloaded (1)', selected: true })).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: '♥ Favorites (1)', selected: false })).toBeOnTheScreen();
+
+      await fireEvent.press(screen.getByText('♥ Favorites (1)'));
+      expect(screen.getByRole('button', { name: 'Downloaded (1)', selected: false })).toBeOnTheScreen();
+      expect(screen.getByText('Story A')).toBeOnTheScreen();
+      expect(screen.queryByText('Story B')).not.toBeOnTheScreen();
+      expect(screen.queryByText(/^\d+ stor(y|ies) · /)).not.toBeOnTheScreen();
+    });
+
+    it('still renders the Bedtime entry beside the three filters', async () => {
+      await render(<LibraryScreen />);
+
+      expect(screen.getByRole('button', { name: 'Bedtime' })).toBeOnTheScreen();
+      expect(screen.getAllByRole('button', { name: /^(All stories|♥ Favorites|Downloaded)/ })).toHaveLength(3);
     });
   });
 

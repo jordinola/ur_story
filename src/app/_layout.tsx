@@ -6,8 +6,10 @@ import { BedtimeLock } from '../components/BedtimeLock';
 import { HeaderLogo } from '../components/HeaderLogo';
 import { MiniPlayer } from '../components/MiniPlayer';
 import { ProfileMenu } from '../components/ProfileMenu';
+import { RemoveDownloadGate } from '../components/RemoveDownloadGate';
 import { SplashGate } from '../components/SplashGate';
 import { BedtimeProvider } from '../lib/BedtimeProvider';
+import { DownloadsProvider } from '../lib/DownloadsProvider';
 import { LibraryProvider } from '../lib/LibraryProvider';
 import { PlayerProvider } from '../lib/PlayerProvider';
 import { ProfilesProvider } from '../lib/ProfilesProvider';
@@ -25,33 +27,36 @@ export default function RootLayout() {
   return (
     <ProfilesProvider>
       <LibraryProvider>
-        <PlayerProvider>
-          <BedtimeProvider>
-            <QueueProvider>
-              <SplashGate />
-              <StatusBar style="dark" />
-              <View style={{ flex: 1, backgroundColor: colors.bg }}>
-                <View style={{ flex: 1 }}>
-                  <Stack
-                    screenOptions={{
-                      headerStyle: { backgroundColor: colors.bg },
-                      headerTintColor: colors.text,
-                      headerTitleStyle: { fontFamily: fonts.rounded, fontWeight: '700' },
-                      headerShadowVisible: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  >
-                    <Stack.Screen name="index" options={{ title: 'UR Story', headerTitle: () => <HeaderLogo />, headerRight: () => <ProfileMenu /> }} />
-                    <Stack.Screen name="story/[id]" options={{ title: '', headerBackTitle: 'Stories' }} />
-                    <Stack.Screen name="profiles" options={{ presentation: 'modal', headerShown: false }} />
-                  </Stack>
+        <DownloadsProvider>
+          <PlayerProvider>
+            <BedtimeProvider>
+              <QueueProvider>
+                <SplashGate />
+                <StatusBar style="dark" />
+                <View style={{ flex: 1, backgroundColor: colors.bg }}>
+                  <View style={{ flex: 1 }}>
+                    <Stack
+                      screenOptions={{
+                        headerStyle: { backgroundColor: colors.bg },
+                        headerTintColor: colors.text,
+                        headerTitleStyle: { fontFamily: fonts.rounded, fontWeight: '700' },
+                        headerShadowVisible: false,
+                        contentStyle: { backgroundColor: colors.bg },
+                      }}
+                    >
+                      <Stack.Screen name="index" options={{ title: 'UR Story', headerTitle: () => <HeaderLogo />, headerRight: () => <ProfileMenu /> }} />
+                      <Stack.Screen name="story/[id]" options={{ title: '', headerBackTitle: 'Stories' }} />
+                      <Stack.Screen name="profiles" options={{ presentation: 'modal', headerShown: false }} />
+                    </Stack>
+                  </View>
+                  <MiniPlayer />
+                  <BedtimeLock />
+                  <RemoveDownloadGate />
                 </View>
-                <MiniPlayer />
-                <BedtimeLock />
-              </View>
-            </QueueProvider>
-          </BedtimeProvider>
-        </PlayerProvider>
+              </QueueProvider>
+            </BedtimeProvider>
+          </PlayerProvider>
+        </DownloadsProvider>
       </LibraryProvider>
     </ProfilesProvider>
   );
