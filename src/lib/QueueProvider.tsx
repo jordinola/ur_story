@@ -39,6 +39,10 @@ type QueueContextValue = {
   clear: () => void;
   /** Stops the countdown; the queue is kept and nothing starts. */
   cancelUpNext: () => void;
+  /** Cancels any gap and starts the head of the queue now; does nothing on an empty queue. */
+  playNextNow: () => void;
+  /** Cancels any gap and starts the queued story with this id now; the others stay queued. Unknown id does nothing. */
+  playNow: (id: string) => void;
 };
 
 const QueueContext = createContext<QueueContextValue | null>(null);
@@ -103,6 +107,10 @@ export function QueueProvider({ children }: { children: ReactNode }) {
     [commitQueue],
   );
 
+  const followOnStoryScreen = useCallback((story: Story) => {
+    if (pathnameRef.current.startsWith('/story/')) router.setParams({ id: story.id });
+  }, []);
+
   // Starts the head of the queue. A story that fails to load is dropped and the next one is tried.
   const advance = useCallback(() => {
     let rest = queueRef.current;
@@ -113,8 +121,8 @@ export function QueueProvider({ children }: { children: ReactNode }) {
       if (shifted.next && playRef.current(shifted.next) !== false) started = shifted.next;
     }
     commitQueue(rest);
-    if (started && pathnameRef.current.startsWith('/story/')) router.setParams({ id: started.id });
-  }, [commitQueue]);
+    if (started) followOnStoryScreen(started);
+  }, [commitQueue, followOnStoryScreen]);
 
   // End conditions are checked again here: a bedtime lock or a sleep expiry since the finish wins.
   const endGap = useCallback(() => {
@@ -122,6 +130,24 @@ export function QueueProvider({ children }: { children: ReactNode }) {
     if (lockedRef.current || sleepExpiredRef.current !== expiredAtFinish.current) return;
     advance();
   }, [cancelUpNext, advance]);
+
+  // An explicit Next tap: no sleep-expiry or bedtime baseline check, unlike the gap ending by itself.
+  const playNextNow = useCallback(() => {
+    cancelUpNext();
+    advance();
+  }, [cancelUpNext, advance]);
+
+  // An explicit tap on a queued story: the stories above it stay queued, and a failed start is not retried.
+  const playNow = useCallback(
+    (id: string) => {
+      const story = queueRef.current.find((queued) => queued.id === id);
+      if (!story) return;
+      cancelUpNext();
+      commitQueue(removeFromQueue(queueRef.current, id));
+      if (playRef.current(story) !== false) followOnStoryScreen(story);
+    },
+    [cancelUpNext, commitQueue, followOnStoryScreen],
+  );
 
   const startGap = useCallback(() => {
     stopGapTimer();
@@ -222,8 +248,10 @@ export function QueueProvider({ children }: { children: ReactNode }) {
       remove,
       clear,
       cancelUpNext,
+      playNextNow,
+      playNow,
     }),
-    [queue, gapRemainingSec, enqueue, playNext, moveToTop, remove, clear, cancelUpNext],
+    [queue, gapRemainingSec, enqueue, playNext, moveToTop, remove, clear, cancelUpNext, playNextNow, playNow],
   );
 
   return <QueueContext.Provider value={value}>{children}</QueueContext.Provider>;
