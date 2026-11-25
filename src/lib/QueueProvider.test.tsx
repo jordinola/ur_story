@@ -416,6 +416,135 @@ describe('useQueue', () => {
     expect(router.setParams).not.toHaveBeenCalled();
   });
 
+  it('playNextNow starts the head of the queue immediately', async () => {
+    const { result } = await setupPlayingAWithBAndC();
+
+    await act(async () => result.current.playNextNow());
+
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.play).toHaveBeenCalledWith(B);
+    expect(ids(result.current.queue)).toEqual(['c']);
+  });
+
+  it('playNextNow does nothing on an empty queue', async () => {
+    mockPlayer.current = A;
+    const { result } = await setup();
+
+    await act(async () => result.current.playNextNow());
+
+    expect(mockPlayer.play).not.toHaveBeenCalled();
+    expect(router.setParams).not.toHaveBeenCalled();
+  });
+
+  it('playNextNow cancels a running gap and starts exactly one story', async () => {
+    const { result, finish, tick } = await setupPlayingAWithBAndC();
+
+    await finish();
+    await tick(2000);
+    await act(async () => result.current.playNextNow());
+
+    expect(result.current.gapRemainingSec).toBeNull();
+    expect(result.current.upNext).toBeNull();
+    await tick(GAP_SEC * 1000);
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.play).toHaveBeenCalledWith(B);
+    expect(ids(result.current.queue)).toEqual(['c']);
+  });
+
+  it('playNextNow starts even if the sleep timer expired since the finish', async () => {
+    const { result, finish, rerender } = await setupPlayingAWithBAndC();
+
+    await finish();
+    mockPlayer.sleepExpiredCount += 1;
+    await rerender();
+    await act(async () => result.current.playNextNow());
+
+    expect(mockPlayer.play).toHaveBeenCalledWith(B);
+  });
+
+  it('playNextNow skips a story whose play returns false', async () => {
+    mockPlayer.play.mockImplementation((story) => story.id !== 'b');
+    const { result } = await setupPlayingAWithBAndC();
+
+    await act(async () => result.current.playNextNow());
+
+    expect(mockPlayer.play.mock.calls.map(([s]) => s.id)).toEqual(['b', 'c']);
+    expect(result.current.queue).toEqual([]);
+  });
+
+  it('playNextNow updates the route param on a story screen', async () => {
+    jest.mocked(usePathname).mockReturnValue('/story/a');
+    const { result } = await setupPlayingAWithBAndC();
+
+    await act(async () => result.current.playNextNow());
+
+    expect(router.setParams).toHaveBeenCalledWith({ id: 'b' });
+  });
+
+  it('playNow plays the chosen story and removes only it', async () => {
+    const { result } = await setupPlayingAWithBAndC();
+
+    await act(async () => result.current.playNow('c'));
+
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.play).toHaveBeenCalledWith(C);
+    expect(ids(result.current.queue)).toEqual(['b']);
+  });
+
+  it('playNow keeps the stories above it queued', async () => {
+    const { result } = await setupPlayingAWithBAndC();
+    const D = makeStory({ id: 'd', title: 'D' });
+    await act(async () => result.current.enqueue(D));
+
+    await act(async () => result.current.playNow('c'));
+
+    expect(ids(result.current.queue)).toEqual(['b', 'd']);
+  });
+
+  it('playNow cancels a running gap and starts exactly one story', async () => {
+    const { result, finish, tick } = await setupPlayingAWithBAndC();
+
+    await finish();
+    await tick(2000);
+    await act(async () => result.current.playNow('c'));
+
+    expect(result.current.gapRemainingSec).toBeNull();
+    await tick(GAP_SEC * 1000);
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.play).toHaveBeenCalledWith(C);
+  });
+
+  it('playNow ignores an unknown id', async () => {
+    const { result } = await setupPlayingAWithBAndC();
+
+    await act(async () => result.current.playNow('zzz'));
+
+    expect(mockPlayer.play).not.toHaveBeenCalled();
+    expect(ids(result.current.queue)).toEqual(['b', 'c']);
+    expect(router.setParams).not.toHaveBeenCalled();
+  });
+
+  it('playNow with a failing play drops the story and does not try others', async () => {
+    mockPlayer.play.mockImplementation(() => false);
+    const { result } = await setupPlayingAWithBAndC();
+
+    await act(async () => result.current.playNow('c'));
+
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.play).toHaveBeenCalledWith(C);
+    expect(ids(result.current.queue)).toEqual(['b']);
+    expect(router.setParams).not.toHaveBeenCalled();
+  });
+
+  it('playNow updates the route param on a story screen', async () => {
+    jest.mocked(usePathname).mockReturnValue('/story/a');
+    const { result } = await setupPlayingAWithBAndC();
+
+    await act(async () => result.current.playNow('c'));
+
+    expect(router.setParams).toHaveBeenCalledWith({ id: 'c' });
+  });
+
   it('removing the last queued story during the gap cancels it', async () => {
     mockPlayer.current = A;
     const { result, finish, tick } = await setup();
