@@ -8,11 +8,10 @@ import { TransportIcon } from './TransportIcon';
 
 export function TransportControls() {
   const p = usePlayer();
-  const { queue, playNextNow, cancelUpNext } = useQueue();
+  const { canNext, playNextNow, playPrevious } = useQueue();
   const [barWidth, setBarWidth] = useState(0);
 
   const ratio = p.duration > 0 ? Math.min(1, p.position / p.duration) : 0;
-  const hasNext = queue.length > 0;
 
   const onBarLayout = (e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width);
 
@@ -45,10 +44,7 @@ export function TransportControls() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Previous story"
-          onPress={() => {
-            cancelUpNext();
-            p.seekTo(0);
-          }}
+          onPress={playPrevious}
           style={styles.skip}
         >
           <TransportIcon name="previous" size={SKIP_ICON_SIZE} color={colors.text} />
@@ -70,9 +66,9 @@ export function TransportControls() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Next story"
-          accessibilityState={hasNext ? undefined : { disabled: true }}
-          onPress={hasNext ? playNextNow : undefined}
-          style={[styles.skip, !hasNext && styles.disabled]}
+          accessibilityState={canNext ? undefined : { disabled: true }}
+          onPress={canNext ? playNextNow : undefined}
+          style={[styles.skip, !canNext && styles.disabled]}
         >
           <TransportIcon name="next" size={SKIP_ICON_SIZE} color={colors.text} />
         </Pressable>

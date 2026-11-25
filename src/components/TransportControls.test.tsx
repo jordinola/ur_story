@@ -13,7 +13,7 @@ const mockPlayer = {
   seekBy: jest.fn(),
   seekTo: jest.fn(),
 };
-const mockQueue = { queue: [{ id: 'a' }] as { id: string }[], playNextNow: jest.fn(), cancelUpNext: jest.fn() };
+const mockQueue = { canNext: true, playNextNow: jest.fn(), playPrevious: jest.fn() };
 
 jest.mock('../lib/PlayerProvider', () => ({ usePlayer: () => mockPlayer }));
 jest.mock('../lib/QueueProvider', () => ({ useQueue: () => mockQueue }));
@@ -21,7 +21,7 @@ jest.mock('../lib/QueueProvider', () => ({ useQueue: () => mockQueue }));
 beforeEach(() => {
   jest.clearAllMocks();
   Object.assign(mockPlayer, { isPlaying: false, isLoading: false, position: 65, duration: 300, error: null });
-  mockQueue.queue = [{ id: 'a' }];
+  mockQueue.canNext = true;
 });
 
 describe('TransportControls', () => {
@@ -32,21 +32,13 @@ describe('TransportControls', () => {
     expect(screen.getByText('5:00')).toBeOnTheScreen();
   });
 
-  it('Previous restarts the story', async () => {
+  it('Previous calls playPrevious', async () => {
     await render(<TransportControls />);
 
     await fireEvent.press(screen.getByRole('button', { name: 'Previous story' }));
 
-    expect(mockPlayer.seekTo).toHaveBeenCalledWith(0);
-  });
-
-  it('Previous cancels a running gap', async () => {
-    await render(<TransportControls />);
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Previous story' }));
-
-    expect(mockQueue.cancelUpNext).toHaveBeenCalledTimes(1);
-    expect(mockPlayer.seekTo).toHaveBeenCalledWith(0);
+    expect(mockQueue.playPrevious).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.seekTo).not.toHaveBeenCalled();
   });
 
   it('draws Previous, Play and Next as icons instead of text glyphs', async () => {
@@ -83,8 +75,19 @@ describe('TransportControls', () => {
     expect(mockQueue.playNextNow).toHaveBeenCalledTimes(1);
   });
 
-  it('Next is disabled with an empty queue and does nothing', async () => {
-    mockQueue.queue = [];
+  it('Next is enabled with Repeat all and an empty queue', async () => {
+    mockQueue.canNext = true;
+    await render(<TransportControls />);
+
+    const next = screen.getByLabelText('Next story');
+    expect(next).toBeEnabled();
+    await fireEvent.press(next);
+
+    expect(mockQueue.playNextNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('Next stays dimmed with an empty queue and Repeat off', async () => {
+    mockQueue.canNext = false;
     await render(<TransportControls />);
 
     const next = screen.getByLabelText('Next story');

@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MoreSheet } from '../../components/MoreSheet';
 import { NowPlayingCover } from '../../components/NowPlayingCover';
+import { PlaybackModeChips } from '../../components/PlaybackModeChips';
 import { PlayerBottomBar } from '../../components/PlayerBottomBar';
 import { QueuePanel } from '../../components/QueuePanel';
 import { TransportControls } from '../../components/TransportControls';
@@ -81,7 +82,12 @@ export default function StoryScreen() {
       <>
         <View style={queueOpen ? [styles.leftPane, { width: queuePaneWidth }] : undefined}>
           {cover}
-          {queueOpen ? <QueuePanel /> : null}
+          {queueOpen ? (
+            <>
+              <PlaybackModeChips />
+              <QueuePanel />
+            </>
+          ) : null}
         </View>
         <View style={[styles.details, { flex: 1 }]}>
           {titleRow}
@@ -95,6 +101,7 @@ export default function StoryScreen() {
     body = (
       <View style={styles.details}>
         {cover}
+        <PlaybackModeChips />
         <QueuePanel />
       </View>
     );
