@@ -33,6 +33,12 @@ describe('ParentalGate', () => {
     expect(screen.getByText('What is 6 × 7?')).toBeOnTheScreen();
   });
 
+  it('shows an optional message saying what the gate protects', async () => {
+    await render(<ParentalGate onPass={jest.fn()} onCancel={jest.fn()} message="Remove this story?" />);
+
+    expect(screen.getByText('Remove this story?')).toBeOnTheScreen();
+  });
+
   it('renders each option as a labelled button', async () => {
     await renderGate();
 

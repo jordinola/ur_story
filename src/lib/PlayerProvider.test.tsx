@@ -7,6 +7,7 @@ import { PlayerProvider, usePlayer } from './PlayerProvider';
 
 const mockPlayer = {
   playing: false,
+  isLoaded: false,
   play: jest.fn(),
   pause: jest.fn(),
   replace: jest.fn(),
@@ -24,6 +25,7 @@ let mockStatus = {
   currentTime: 0,
   duration: 0,
   didJustFinish: false,
+  error: null as string | null,
 };
 
 jest.mock('expo-audio', () => ({
@@ -42,6 +44,12 @@ jest.mock('./LibraryProvider', () => ({ useLibrary: () => mockLibrary }));
 let mockActiveId: string | null = 'k1';
 jest.mock('./ProfilesProvider', () => ({ useProfiles: () => ({ activeId: mockActiveId }) }));
 
+const mockLocalUri = jest.fn((_id: string): string | null => null);
+jest.mock('./DownloadsProvider', () => ({ useDownloads: () => ({ localUri: mockLocalUri }) }));
+
+const LOCAL_URI = 'file:///documents/downloads/sleepy-moon.mp3';
+const STREAM_URI = `${ASSET_BASE_URL}/audio/sleepy-moon.mp3`;
+
 const wrapper = ({ children }: { children: ReactNode }) => <PlayerProvider>{children}</PlayerProvider>;
 
 const story = makeStory();
@@ -58,6 +66,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
   mockPlayer.playing = false;
+  mockPlayer.isLoaded = false;
   mockPlayer.volume = 1;
   mockActiveId = 'k1';
   mockLibrary.getProgress.mockReturnValue(0);
@@ -68,7 +77,9 @@ beforeEach(() => {
     currentTime: 0,
     duration: 0,
     didJustFinish: false,
+    error: null,
   };
+  mockLocalUri.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -232,6 +243,254 @@ describe('PlayerProvider', () => {
       await act(async () => result.current.play(makeStory({ id: 'story-2' })));
 
       expect(result.current.error).toBeNull();
+    });
+  });
+
+  describe('downloaded stories', () => {
+    it('play uses the local file when the story is downloaded', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result } = await setup();
+
+      await act(async () => result.current.play(story));
+
+      expect(mockLocalUri).toHaveBeenCalledWith(story.id);
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: LOCAL_URI });
+      expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    });
+
+    it('play streams when the story is not downloaded', async () => {
+      const { result } = await setup();
+
+      await act(async () => result.current.play(story));
+      await act(async () => jest.advanceTimersByTime(20_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: STREAM_URI });
+    });
+
+    it('a local source that does not load in 10 seconds falls back to streaming once', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+
+      await act(async () => jest.advanceTimersByTime(9_999));
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+
+      await act(async () => jest.advanceTimersByTime(1));
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(2);
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: STREAM_URI });
+      expect(mockPlayer.play).toHaveBeenCalledTimes(2);
+
+      await act(async () => jest.advanceTimersByTime(60_000));
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(2);
+      expect(result.current.current).toEqual(story);
+    });
+
+    it('a local source that errors falls back to streaming once', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+
+      setStatus({ error: 'The file could not be opened.' });
+      await rerender({});
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(2);
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: STREAM_URI });
+      expect(mockPlayer.play).toHaveBeenCalledTimes(2);
+
+      // The streaming fallback failing too is not retried.
+      setStatus({ error: null });
+      await rerender({});
+      setStatus({ error: 'The network connection was lost.' });
+      await rerender({});
+      await act(async () => jest.advanceTimersByTime(60_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(2);
+    });
+
+    it('the timeout does not replace a local file the player already loaded', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+
+      // The status never showed the load (isLoaded went true to true), but the live player has it.
+      mockPlayer.isLoaded = true;
+      await act(async () => jest.advanceTimersByTime(10_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: LOCAL_URI });
+    });
+
+    it('the fallback does not resume a story paused while the local file was loading', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+
+      await act(async () => result.current.pause());
+      await act(async () => jest.advanceTimersByTime(10_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(2);
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: STREAM_URI });
+      expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    });
+
+    it('the fallback does not resume a story the bedtime fade paused while loading', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+      await act(async () => result.current.fadeOutAndPause(Date.now() + 3_000));
+
+      await act(async () => jest.advanceTimersByTime(10_000));
+
+      expect(mockPlayer.pause).toHaveBeenCalled();
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: STREAM_URI });
+      expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    });
+
+    it('the fallback plays when the story was paused and played again while loading', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+      await act(async () => result.current.pause());
+      await act(async () => result.current.toggle());
+
+      await act(async () => jest.advanceTimersByTime(10_000));
+
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: STREAM_URI });
+      expect(mockPlayer.play).toHaveBeenCalledTimes(3);
+    });
+
+    it('sets the load error when the streaming fallback cannot be loaded', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+      mockPlayer.replace.mockImplementationOnce(() => {
+        throw new Error('boom');
+      });
+
+      await act(async () => jest.advanceTimersByTime(10_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(2);
+      expect(result.current.error).toMatch(/Could not load this story/);
+    });
+
+    it('a streaming source that fails does not fall back or loop', async () => {
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+
+      setStatus({ error: 'The network connection was lost.' });
+      await rerender({});
+      await act(async () => jest.advanceTimersByTime(60_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    });
+
+    it('the fallback keeps the saved resume position behaviour', async () => {
+      mockLibrary.getProgress.mockReturnValue(75);
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+      await act(async () => jest.advanceTimersByTime(10_000));
+      expect(mockPlayer.seekTo).not.toHaveBeenCalled();
+
+      setStatus({ isLoaded: true });
+      await rerender({});
+
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: STREAM_URI });
+      expect(mockPlayer.seekTo).toHaveBeenCalledTimes(1);
+      expect(mockPlayer.seekTo).toHaveBeenCalledWith(75);
+    });
+
+    it('the fallback starts at 0 when play was fromStart', async () => {
+      mockLibrary.getProgress.mockReturnValue(75);
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story, { fromStart: true }));
+      await act(async () => jest.advanceTimersByTime(10_000));
+
+      setStatus({ isLoaded: true });
+      await rerender({});
+
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: STREAM_URI });
+      expect(mockPlayer.seekTo).not.toHaveBeenCalled();
+    });
+
+    it('does not fall back when the local source loads in time', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+
+      await act(async () => jest.advanceTimersByTime(5_000));
+      setStatus({ isLoaded: true });
+      await rerender({});
+      await act(async () => jest.advanceTimersByTime(60_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the timeout when a different story is played', async () => {
+      mockLocalUri.mockImplementation((id) => (id === story.id ? LOCAL_URI : null));
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+      await act(async () => jest.advanceTimersByTime(5_000));
+
+      await act(async () => result.current.play(makeStory({ id: 'story-2', audio: 'audio/other.mp3' })));
+      await act(async () => jest.advanceTimersByTime(60_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(2);
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: `${ASSET_BASE_URL}/audio/other.mp3` });
+    });
+
+    it('allows a fresh fallback for the next downloaded story', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result } = await setup();
+      await act(async () => result.current.play(story));
+      await act(async () => jest.advanceTimersByTime(10_000));
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(2);
+
+      await act(async () => result.current.play(makeStory({ id: 'story-2', audio: 'audio/other.mp3' })));
+      await act(async () => jest.advanceTimersByTime(10_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(4);
+      expect(mockPlayer.replace).toHaveBeenLastCalledWith({ uri: `${ASSET_BASE_URL}/audio/other.mp3` });
+    });
+
+    it('clears the timeout on unmount', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result, unmount } = await setup();
+      await act(async () => result.current.play(story));
+
+      await unmount();
+      await act(async () => jest.advanceTimersByTime(60_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the timeout on a profile switch', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+
+      mockActiveId = 'k2';
+      await rerender({});
+      await act(async () => jest.advanceTimersByTime(60_000));
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fall back after a profile switch even when the old source errors', async () => {
+      mockLocalUri.mockReturnValue(LOCAL_URI);
+      const { result, rerender } = await setup();
+      await act(async () => result.current.play(story));
+
+      mockActiveId = 'k2';
+      await rerender({});
+      setStatus({ error: 'The file could not be opened.' });
+      await rerender({});
+
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -55,6 +55,73 @@ describe('showStoryActions on iOS', () => {
   });
 });
 
+describe('story actions download entry', () => {
+  beforeEach(() => {
+    Platform.OS = 'ios';
+  });
+
+  const optionsShown = (handlers: Parameters<typeof showStoryActions>[1]) => {
+    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => {});
+    showStoryActions(story, handlers);
+    return spy.mock.lastCall?.[0];
+  };
+
+  it('story actions show Download for a story that is not downloaded', () => {
+    const options = optionsShown({ ...setup(), download: { label: 'Download', onPress: jest.fn() } });
+
+    expect(options).toEqual({
+      title: 'The Sleepy Moon',
+      options: ['Play next', 'Add to queue', 'Download', 'Cancel'],
+      cancelButtonIndex: 3,
+    });
+  });
+
+  it('story actions show Cancel download while downloading', () => {
+    const options = optionsShown({ ...setup(), download: { label: 'Cancel download', onPress: jest.fn() } });
+
+    expect(options?.options).toEqual(['Play next', 'Add to queue', 'Cancel download', 'Cancel']);
+    expect(options?.cancelButtonIndex).toBe(3);
+  });
+
+  it('story actions show Remove download for a downloaded story that is not playing', () => {
+    const options = optionsShown({ ...setup(), download: { label: 'Remove download', onPress: jest.fn() } });
+
+    expect(options).toEqual({
+      title: 'The Sleepy Moon',
+      options: ['Play next', 'Add to queue', 'Remove download', 'Cancel'],
+      cancelButtonIndex: 3,
+      destructiveButtonIndex: 2,
+    });
+  });
+
+  it('story actions show no remove entry for the playing story', () => {
+    const options = optionsShown(setup());
+
+    expect(options?.options).toEqual(['Play next', 'Add to queue', 'Cancel']);
+    expect(options?.cancelButtonIndex).toBe(2);
+  });
+
+  it('choosing the download entry calls its handler', () => {
+    jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_o, cb) => cb(2));
+    const handlers = { ...setup(), download: { label: 'Download' as const, onPress: jest.fn() } };
+
+    showStoryActions(story, handlers);
+
+    expect(handlers.download.onPress).toHaveBeenCalledTimes(1);
+    expect(handlers.onPlayNext).not.toHaveBeenCalled();
+    expect(handlers.onAddToQueue).not.toHaveBeenCalled();
+  });
+
+  it('choosing Cancel with a download entry calls nothing', () => {
+    jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_o, cb) => cb(3));
+    const handlers = { ...setup(), download: { label: 'Download' as const, onPress: jest.fn() } };
+
+    showStoryActions(story, handlers);
+
+    expect(handlers.download.onPress).not.toHaveBeenCalled();
+  });
+});
+
 describe('showStoryActions elsewhere', () => {
   beforeEach(() => {
     Platform.OS = 'android';
@@ -74,5 +141,29 @@ describe('showStoryActions elsewhere', () => {
     expect(buttons.map((b) => b.text)).toEqual(['Play next', 'Add to queue', 'Cancel']);
     buttons[1]?.onPress?.();
     expect(handlers.onAddToQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists the download entry in place of Cancel so Android keeps every choice', () => {
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const handlers = { ...setup(), download: { label: 'Cancel download' as const, onPress: jest.fn() } };
+
+    showStoryActions(story, handlers);
+
+    const buttons = spy.mock.lastCall?.[2] ?? [];
+    // Android's Alert keeps only the first three buttons.
+    expect(buttons.length).toBeLessThanOrEqual(3);
+    expect(buttons.map((b) => b.text)).toEqual(['Play next', 'Add to queue', 'Cancel download']);
+    buttons[2]?.onPress?.();
+    expect(handlers.download.onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets back or a tap outside dismiss the Alert', () => {
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    showStoryActions(story, { ...setup(), download: { label: 'Download', onPress: jest.fn() } });
+    expect(spy.mock.lastCall?.[3]).toEqual({ cancelable: true });
+
+    showStoryActions(story, setup());
+    expect(spy.mock.lastCall?.[3]).toEqual({ cancelable: true });
   });
 });

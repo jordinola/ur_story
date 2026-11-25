@@ -6,9 +6,10 @@ import { cardShadow, colors, fonts, radius } from '../theme';
 
 const RETRY_MESSAGE = 'Not quite. Here is a new one!';
 
-type Props = { onPass: () => void; onCancel: () => void; hideCancel?: boolean };
+// `message` says what the gate protects (e.g. which download it removes), under the title.
+type Props = { onPass: () => void; onCancel: () => void; hideCancel?: boolean; message?: string };
 
-export function ParentalGate({ onPass, onCancel, hideCancel = false }: Props) {
+export function ParentalGate({ onPass, onCancel, hideCancel = false, message }: Props) {
   const insets = useSafeAreaInsets();
   const [question, setQuestion] = useState(() => makeGateQuestion());
   const [retry, setRetry] = useState(false);
@@ -40,6 +41,7 @@ export function ParentalGate({ onPass, onCancel, hideCancel = false }: Props) {
       <Text accessibilityRole="header" style={styles.title}>
         Grown-ups only
       </Text>
+      {message ? <Text style={styles.message}>{message}</Text> : null}
       <Text style={styles.prompt}>{question.prompt}</Text>
       {retry ? <Text style={styles.retry}>{RETRY_MESSAGE}</Text> : null}
       <View style={styles.options}>
@@ -68,6 +70,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   title: { color: colors.text, fontFamily: fonts.rounded, fontSize: 28, fontWeight: '800', textAlign: 'center' },
+  message: { color: colors.text, fontSize: 17, lineHeight: 24, textAlign: 'center', maxWidth: 420 },
   prompt: { color: colors.text, fontFamily: fonts.rounded, fontSize: 22, fontWeight: '700', textAlign: 'center' },
   retry: { color: colors.muted, fontSize: 16, textAlign: 'center' },
   options: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16, marginVertical: 8 },
