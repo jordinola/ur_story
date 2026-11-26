@@ -23,6 +23,7 @@
     "react-native-svg": "15.16.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1178.0",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
     "@types/react": "~19.3.0",
@@ -30,6 +31,7 @@
     "eslint-config-expo": "~58.0.4",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.15",
+    "music-metadata": "^13.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -41,7 +43,10 @@
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "audio:placeholders": "node scripts/placeholderAudio.js"
+    "audio:placeholders": "node scripts/placeholderAudio.js",
+    "story:publish": "node scripts/storyCli.js publish",
+    "story:remove": "node scripts/storyCli.js remove",
+    "story:index": "node scripts/storyCli.js index"
   },
   "private": true,
   "jest": {

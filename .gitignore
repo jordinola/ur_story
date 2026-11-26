@@ -45,3 +45,7 @@ coverage/
 
 # generated placeholder audio
 /placeholder-audio
+
+# story media is published to R2 by npm run story:publish; only story.json is committed
+/content/stories/*/*
+!/content/stories/*/story.json

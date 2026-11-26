@@ -1,0 +1,17 @@
+{
+  "id": "luna-y-el-bosque",
+  "title": "Luna y el bosque",
+  "description": "Luna descubre un bosque donde los árboles cuentan secretos al atardecer.",
+  "ageRange": "4-7",
+  "genres": [
+    "Adventure",
+    "Fantasy"
+  ],
+  "tags": [
+    "Nature",
+    "Magic"
+  ],
+  "language": "es",
+  "color": "#6BCB77",
+  "emoji": "🌳"
+}
