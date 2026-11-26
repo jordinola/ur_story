@@ -257,4 +257,33 @@ describe('ProfileMenu during a bedtime session', () => {
 
     expect(screen.queryByRole('button', { name: 'Leo' })).not.toBeOnTheScreen();
   });
+
+  it('closes then opens privacy and safety', async () => {
+    await open();
+    await fireEvent.press(screen.getByRole('button', { name: 'Privacy & Safety' }));
+    await finishDismiss();
+
+    expect(router.push).toHaveBeenCalledWith('/privacy');
+  });
+
+  it('offers privacy and safety even with no profiles', async () => {
+    mockProfiles.profiles = [];
+    mockProfiles.activeProfile = null;
+    mockProfiles.activeId = null;
+    await open('Profiles menu');
+
+    expect(screen.getByRole('button', { name: 'Privacy & Safety' })).toBeOnTheScreen();
+  });
+
+  it('does not open privacy and safety once bedtime has locked the app', async () => {
+    mockBedtime.active = true;
+    const { rerender } = await render(<ProfileMenu />);
+    await fireEvent.press(screen.getByLabelText('Profile menu for Mia'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Privacy & Safety' }));
+    mockBedtime.locked = true;
+    await rerender(<ProfileMenu />);
+    await finishDismiss();
+
+    expect(router.push).not.toHaveBeenCalled();
+  });
 });

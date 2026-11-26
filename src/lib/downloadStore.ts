@@ -122,3 +122,9 @@ export function localUri(storyId: string): string | null {
   const file = finishedFileFor(storyId);
   return file?.exists ? file.uri : null;
 }
+
+// Used by "Delete all data": the providers are unmounted first, so nothing is downloading or playing from here.
+export function removeAllDownloads(): void {
+  const directory = downloadsDirectory();
+  if (directory.exists) directory.delete();
+}

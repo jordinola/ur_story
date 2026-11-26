@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
-import { leave } from './navigation';
+import { leave, resetToHome } from './navigation';
 
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) },
+  router: { back: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true), dismissAll: jest.fn() },
 }));
 
 beforeEach(() => jest.clearAllMocks());
@@ -22,5 +22,13 @@ describe('leave', () => {
 
     expect(router.replace).toHaveBeenCalledWith('/');
     expect(router.back).not.toHaveBeenCalled();
+  });
+});
+
+describe('resetToHome', () => {
+  it('dismisses every open screen so home is the only route', () => {
+    resetToHome();
+
+    expect(router.dismissAll).toHaveBeenCalledTimes(1);
   });
 });
