@@ -129,8 +129,63 @@ describe('PlayerProvider', () => {
       expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
         true,
         expect.objectContaining({ title: story.title }),
+        expect.any(Object),
       );
       expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes the cover as artwork, the first genre as album and not-live options to the widget', async () => {
+      const { result } = await setup();
+      const withCover = makeStory({ cover: 'stories/sleepy-moon/cover.jpg', genres: ['Bedtime', 'Fantasy'] });
+
+      await act(async () => result.current.play(withCover));
+
+      expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
+        true,
+        {
+          title: withCover.title,
+          artist: 'UR Story',
+          albumTitle: 'Bedtime',
+          artworkUrl: `${ASSET_BASE_URL}/stories/sleepy-moon/cover.jpg`,
+        },
+        {
+          isLiveStream: false,
+          showSeekBackward: true,
+          showSeekForward: true,
+          seekBackwardIntervalSeconds: 15,
+          seekForwardIntervalSeconds: 15,
+        },
+      );
+    });
+
+    it('falls back to the default album and no artwork for a story without a cover or genres', async () => {
+      const { result } = await setup();
+
+      await act(async () => result.current.play(story));
+
+      expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
+        true,
+        { title: story.title, artist: 'UR Story', albumTitle: 'Bedtime stories', artworkUrl: undefined },
+        {
+          isLiveStream: false,
+          showSeekBackward: true,
+          showSeekForward: true,
+          seekBackwardIntervalSeconds: 15,
+          seekForwardIntervalSeconds: 15,
+        },
+      );
+    });
+
+    it('keeps a full https cover URL as the artwork', async () => {
+      const { result } = await setup();
+
+      await act(async () => result.current.play(makeStory({ cover: 'https://cdn.example.com/c.jpg' })));
+
+      expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
+        true,
+        expect.objectContaining({ artworkUrl: 'https://cdn.example.com/c.jpg' }),
+        expect.any(Object),
+      );
     });
 
     it('uses the story duration while the audio is still loading', async () => {

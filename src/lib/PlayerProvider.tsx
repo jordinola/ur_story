@@ -53,6 +53,8 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 const PROGRESS_SAVE_INTERVAL_MS = 5000;
 const SLEEP_TICK_MS = 1000;
 const FADE_TICK_MS = 250;
+/** Matches the in-app skip buttons (SEEK_STEP_SEC in TransportControls). */
+const LOCK_SCREEN_SEEK_SEC = 15;
 /** A downloaded file that has not loaded by then is replaced by the stream. */
 export const LOCAL_LOAD_TIMEOUT_MS = 10_000;
 
@@ -169,11 +171,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           localFallback.current = story;
           localLoadTimer.current = setTimeout(onLocalLoadTimeout, LOCAL_LOAD_TIMEOUT_MS);
         }
-        player.setActiveForLockScreen(true, {
-          title: story.title,
-          artist: 'UR Story',
-          albumTitle: 'Bedtime stories',
-        });
+        player.setActiveForLockScreen(
+          true,
+          {
+            title: story.title,
+            artist: 'UR Story',
+            albumTitle: story.genres[0] ?? 'Bedtime stories',
+            artworkUrl: story.cover ? resolveUrl(story.cover) : undefined,
+          },
+          // Not live: the item has no duration yet when the session starts, which iOS reads as a live stream.
+          {
+            isLiveStream: false,
+            showSeekBackward: true,
+            showSeekForward: true,
+            seekBackwardIntervalSeconds: LOCK_SCREEN_SEEK_SEC,
+            seekForwardIntervalSeconds: LOCK_SCREEN_SEEK_SEC,
+          },
+        );
         player.play();
         return true;
       } catch {
