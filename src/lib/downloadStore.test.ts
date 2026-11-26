@@ -1,6 +1,13 @@
 import { makeStory } from '../test/fixtures';
 import { resolveUrl } from './catalog';
-import { downloadedSize, listDownloaded, localUri, removeDownloaded, startDownload } from './downloadStore';
+import {
+  downloadedSize,
+  listDownloaded,
+  localUri,
+  removeAllDownloads,
+  removeDownloaded,
+  startDownload,
+} from './downloadStore';
 
 type MockProgress = { bytesWritten: number; totalBytes: number };
 type MockPart = string | { uri: string };
@@ -94,6 +101,13 @@ jest.mock('expo-file-system', () => {
     }
     create() {
       mockFs.dirs.add(this.uri);
+    }
+    delete() {
+      if (!this.exists) throw new Error(`missing ${this.uri}`);
+      mockFs.dirs.delete(this.uri);
+      for (const uri of [...mockFs.files.keys()]) {
+        if (parentOf(uri) === this.uri) mockFs.files.delete(uri);
+      }
     }
     list() {
       if (!this.exists) throw new Error(`missing ${this.uri}`);
@@ -294,5 +308,23 @@ describe('downloadedSize', () => {
     mockFs.files.set(finishedUri, 4200);
     expect(downloadedSize('sleepy-moon')).toBe(4200);
     expect(mockFs.files.has(partUri)).toBe(true);
+  });
+});
+
+describe('removeAllDownloads', () => {
+  it('deletes the downloads folder with every file in it', () => {
+    mockFs.files.set(`${DIR}/sleepy-moon.mp3`, 1200);
+    mockFs.files.set(`${DIR}/brave-fox.m4a.part`, 10);
+
+    removeAllDownloads();
+
+    expect(mockFs.dirs.has(DIR)).toBe(false);
+    expect(mockFs.files.size).toBe(0);
+  });
+
+  it('does nothing when the downloads folder does not exist', () => {
+    mockFs.dirs.delete(DIR);
+
+    expect(() => removeAllDownloads()).not.toThrow();
   });
 });

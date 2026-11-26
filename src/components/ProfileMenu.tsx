@@ -27,6 +27,7 @@ const MIN_MENU_HEIGHT = 120;
 type TriggerBox = { x: number; y: number; width: number; height: number };
 const PROFILES_ROUTE = '/profiles' as Href;
 const ADD_PROFILE_ROUTE = '/profiles/edit' as Href;
+const PRIVACY_ROUTE = '/privacy' as Href;
 
 export function ProfileMenu() {
   const { ready, profiles, activeProfile, activeId, setActive } = useProfiles();
@@ -177,6 +178,14 @@ export function ProfileMenu() {
                   <Text style={styles.linkText}>Add a kid profile</Text>
                 </Pressable>
               )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Privacy & Safety"
+                onPress={() => go(PRIVACY_ROUTE)}
+                style={styles.row}
+              >
+                <Text style={styles.linkText}>Privacy & Safety</Text>
+              </Pressable>
             </ScrollView>
           </View>
         </View>

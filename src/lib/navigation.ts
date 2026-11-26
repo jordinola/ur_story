@@ -8,3 +8,8 @@ export function leave(): void {
   if (router.canGoBack()) router.back();
   else router.replace('/');
 }
+
+/** Closes every open modal and pushed screen so home is the only route left. */
+export function resetToHome(): void {
+  router.dismissAll();
+}
