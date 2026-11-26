@@ -1,0 +1,17 @@
+{
+  "id": "sleepy-moon",
+  "title": "The Sleepy Moon",
+  "description": "A little moon who can't fall asleep goes looking for the perfect lullaby.",
+  "ageRange": "3-6",
+  "genres": [
+    "Bedtime",
+    "Fantasy"
+  ],
+  "tags": [
+    "Bedtime",
+    "Space"
+  ],
+  "language": "en",
+  "color": "#7C83FD",
+  "emoji": "🌙"
+}
