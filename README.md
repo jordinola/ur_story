@@ -101,6 +101,22 @@ Each entry in `stories.json` looks like this:
 ```
 `audio` and `cover` are paths relative to `ASSET_BASE_URL`, or full https URLs. `cover` is optional; without it the card falls back to the color and emoji.
 
+## TestFlight builds (EAS)
+Builds run in the cloud with EAS, so no Mac is needed. `eas.json` has three profiles:
+
+- `development`: a dev client build for your own registered devices (`npx eas-cli@latest build --profile development --platform ios`).
+- `preview`: an internal (ad hoc) build of the real app for registered devices, without TestFlight.
+- `production`: an App Store build for TestFlight and release.
+
+The build number is managed by EAS (`appVersionSource: "remote"`) and goes up by one on every production build, so don't set `ios.buildNumber` in `app.json`; EAS ignores it. The user-facing version is `version` in `app.json`. Bump it yourself for each new release.
+
+To ship a TestFlight build:
+```bash
+npx eas-cli@latest build --profile production --platform ios
+npx eas-cli@latest submit --profile production --platform ios --latest
+```
+The first run asks you to sign in to your Apple Developer account and lets EAS create the certificates and provisioning profile. `submit` asks for the App Store Connect app if `submit.production.ios.ascAppId` isn't set in `eas.json`; add it once the app record exists so later submits don't prompt.
+
 ## Before you ship
 - Change `ios.bundleIdentifier` in `app.json` (currently `com.james.urstory`) if you want a different one.
 - Replace the placeholder icon and splash in `assets/`.
